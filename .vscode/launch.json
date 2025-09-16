@@ -1,0 +1,30 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "Main",
+            "projectName": "G-VRPSPD_VDNS_ed17d623"
+        },
+        {
+            "type": "java",
+            "name": "Main",
+            "request": "launch",
+            "mainClass": "Main",
+            "projectName": "G-VRPSPD-LNS_c6892b44",
+            "vmArgs": "-Djava.library.path=c:\\'Program Files'\\IBM\\ILOG\\CPLEX_Studio2211\\cplex\\bin\\x64_win64"
+        }
+    ]
+}
+
+// Note: If you are using a different version of CPLEX, please adjust the path accordingly.
+// The path should point to the x86-64 binary directory in your CPLEX installation directory.
+// Example paths for different operating systems:
+// Linux:   /opt/ibm/ILOG/CPLEX_Studio2211/cplex/bin/x86-64_linux
+// Mac:     /Applications/CPLEX_Studio2211/cplex/bin/x86-64_osx
+// Windows  c:\\'Program Files'\\IBM\\ILOG\\CPLEX_Studio2211\\cplex\\bin\\x64_win64
+
+// OBS: If you are using Windows and the path contains spaces (e.g., "Program Files"), make sure to escape them properly as shown above.
+// OBS2: When running from VSCode, a new configuration may sometimes be created without the vmArgs parameter. Always check that vmArgs is included before starting the project.
