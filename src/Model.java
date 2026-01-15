@@ -280,7 +280,7 @@ public class Model {
             for (Link linkJI : linkManager.getAllOutgoingLinks(j)) {
                 exp.addTerm(-1, linkJI.deliveryCplexVar);
             }
-            cplex.addEq(exp, Data.allNodes.get(j).delivery(), "expression13(" + j + ")");
+            cplex.addEq(exp, Data.allNodes.get(j).delivery(), "expression14(" + j + ")");
         }
     }
 
