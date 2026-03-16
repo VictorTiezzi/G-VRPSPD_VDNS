@@ -6,16 +6,9 @@
             "name": "Main",
             "request": "launch",
             "mainClass": "Main",
-            "projectName": "G-VRPSPD_VDNS_ed17d623"
+            "projectName": "g-vrpspdvdns_4540a76e",
+            "vmArgs": "-Djava.library.path=/opt/ibm/ILOG/CPLEX_Studio/cplex/bin/x86-64_linux"
         },
-        {
-            "type": "java",
-            "name": "Main",
-            "request": "launch",
-            "mainClass": "Main",
-            "projectName": "G-VRPSPD-LNS_c6892b44",
-            "vmArgs": "-Djava.library.path=c:\\'Program Files'\\IBM\\ILOG\\CPLEX_Studio2211\\cplex\\bin\\x64_win64"
-        }
     ]
 }
 

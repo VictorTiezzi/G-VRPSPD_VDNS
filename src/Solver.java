@@ -16,8 +16,8 @@ public class Solver {
         String[] filenames = { "CMT5X" };
 
         int subprobTimeLimit = 30;
-        int numberOfExecutions = 10;
-        int solverTimeLimit = 3600;
+        int numberOfExecutions = 1;
+        int solverTimeLimit = 300;
 
         for (String filename : filenames) {
             new Data(filename);

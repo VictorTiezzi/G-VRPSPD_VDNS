@@ -1,6 +1,6 @@
 {
     "java.project.referencedLibraries": [
-        "c:\\Program Files\\IBM\\ILOG\\CPLEX_Studio2212\\cplex\\lib\\cplex.jar"
+        "/opt/ibm/ILOG/CPLEX_Studio/cplex/lib/cplex.jar"
     ],
     "java.project.sourcePaths": [
         "src"

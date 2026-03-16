@@ -1,3 +1,5 @@
+.cplex/*.bin
+
 # folders
 solution/
 out/

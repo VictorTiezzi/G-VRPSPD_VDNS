@@ -1,0 +1,12 @@
+{
+    "name": "VRP com CPLEX",
+    "image": "mcr.microsoft.com/devcontainers/java",
+    "postCreateCommand": "if [ -f ./.cplex/cplex_studio.linux_x86_64.bin ]; then chmod +x ./.cplex/cplex_studio.linux_x86_64.bin && sudo ./.cplex/cplex_studio.linux_x86_64.bin LAX_VM $(which java) -i silent; else echo 'Aviso: Instalador do CPLEX não encontrado na pasta cplex. Instalação ignorada.'; fi",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vscjava.vscode-java-pack"
+            ]
+        }
+    }
+}
