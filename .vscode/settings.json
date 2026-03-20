@@ -11,6 +11,6 @@
 // Note: If you are using a different version of CPLEX, please adjust the path accordingly.
 // The path should point to the cplex.jar file in your CPLEX installation directory.
 // Example paths for different operating systems:
-// Linux:   /opt/ibm/ILOG/CPLEX_Studio2211/cplex/lib/cplex.jar
-// Mac:     /Applications/CPLEX_Studio2211/cplex/lib/cplex.jar
-// Windows  C:\\Program Files\\IBM\\ILOG\\CPLEX_Studio2211\\cplex\\lib\\cplex.jar
+// Linux:   /opt/ibm/ILOG/CPLEX_Studio/cplex/lib/cplex.jar
+// Mac:     /Applications/CPLEX_Studio/cplex/lib/cplex.jar
+// Windows  C:\\Program Files\\IBM\\ILOG\\CPLEX_Studio\\cplex\\lib\\cplex.jar

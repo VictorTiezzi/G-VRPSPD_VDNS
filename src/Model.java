@@ -115,12 +115,13 @@ public class Model {
     }
 
     public void warmStart(List<Solution> solutionsIn) {
+        if (solutionsIn == null || solutionsIn.isEmpty()) 
+            return;
         try {
             mipStart(solutionsIn);
         } catch (IloException e) {
             e.printStackTrace();
         }
-
     }
 
     private void expression01() throws IloException {

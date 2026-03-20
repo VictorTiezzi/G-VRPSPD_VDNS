@@ -69,17 +69,16 @@ public class VariableDepthNeighborhoodSearch {
 
         do {
 
-            if (remainingNodes.size() < cliqueSize)
+            if (remainingNodes.isEmpty())
                 remainingNodes = new ArrayList<>(nodes);
 
             List<Node> clique = buildClique(remainingNodes, cliqueSize);
 
             Set<Link> subMatrix = buildSubproblemLinks(clique, allCurrentSolutions);
 
-            double timeLimit = getElapsedTime() + subproblemTimeLimit <= solverTimeLimit
-                    ? subproblemTimeLimit
-                    : solverTimeLimit - getElapsedTime();
-
+            double timeLimit = Math.min(subproblemTimeLimit, solverTimeLimit - getElapsedTime());
+            if (timeLimit <= 0) break;
+            
             List<Solution> solutionsFromCplex = new LinkedList<>();
             Model model = new Model(timeLimit, subMatrix);
             if (model.solveModel())
@@ -110,7 +109,7 @@ public class VariableDepthNeighborhoodSearch {
             }
 
             iterationCounter++;
-        } while (getElapsedTime() <= solverTimeLimit);
+        } while (getElapsedTime() < solverTimeLimit);
 
         printCnt();
         exportSolution(bestSolution, "best", 0);
