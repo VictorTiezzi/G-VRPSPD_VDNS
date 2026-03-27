@@ -39,7 +39,7 @@ public class LocalSearch {
 
             // Perform interchange optimization
             improved |= performInterchange(routes);
-            
+
         }
 
         return new Solution(routes, "LocalSearch", 0.0, (System.currentTimeMillis() - startTime) / 1000);
@@ -205,94 +205,6 @@ public class LocalSearch {
                         routeImproved = true;
                         break outer;
                     }
-                }
-            }
-        }
-        return improved;
-    }
-
-    private boolean performCrossover(List<Route> routes, int zxc) {
-        boolean improved = false;
-
-        for (int route_IndexA = 0; route_IndexA < routes.size(); route_IndexA++) {
-            for (int route_IndexB = route_IndexA + 1; route_IndexB < routes.size(); route_IndexB++) {
-                Route routeA = routes.get(route_IndexA);
-                Route routeB = routes.get(route_IndexB);
-                double originalCost = routeA.totalCost + routeB.totalCost;
-                double bestDelta = 0;
-                Route bestRouteA = null, bestRouteB = null;
-
-                for (int i = 0; i < routeA.nodes.size(); i++) {
-                    for (int j = i + 2; j < routeA.nodes.size(); j++) {
-
-                        for (int k = 0; k < routeB.nodes.size(); k++) {
-                            for (int l = k + 2; l < routeB.nodes.size(); l++) {
-
-                                List<Node> candidateNodeA1 = new ArrayList<>(routeA.nodes.subList(0, i));
-                                List<Node> candidateNodeA2 = new ArrayList<>(routeA.nodes.subList(0, i));
-
-                                List<Node> subPathB = new ArrayList<>(routeB.nodes.subList(k, l));
-
-                                candidateNodeA1.addAll(subPathB);
-                                candidateNodeA2.addAll(subPathB.reversed());
-
-                                candidateNodeA1.addAll(routeA.nodes.subList(j, routeA.nodes.size()));
-                                candidateNodeA2.addAll(routeA.nodes.subList(j, routeA.nodes.size()));
-
-                                List<Node> candidateNodeB1 = new ArrayList<>(routeB.nodes.subList(0, k));
-                                List<Node> candidateNodeB2 = new ArrayList<>(routeB.nodes.subList(0, k));
-
-                                List<Node> subPathA = new ArrayList<>(routeA.nodes.subList(i, j));
-
-                                candidateNodeB1.addAll(subPathA);
-                                candidateNodeB2.addAll(subPathA.reversed());
-
-                                candidateNodeB1.addAll(routeB.nodes.subList(l, routeB.nodes.size()));
-                                candidateNodeB2.addAll(routeB.nodes.subList(l, routeB.nodes.size()));
-
-                                List<Route> candidateRoutesA = new ArrayList<>();
-
-                                Route candidateRouteA1 = new Route(candidateNodeA1, instance);
-                                if (candidateRouteA1.isFeasible)
-                                    candidateRoutesA.add(candidateRouteA1);
-
-                                Route candidateRouteA2 = new Route(candidateNodeA2, instance);
-                                if (candidateRouteA2.isFeasible)
-                                    candidateRoutesA.add(candidateRouteA2);
-
-                                List<Route> candidateRoutesB = new ArrayList<>();
-
-                                Route candidateRouteB1 = new Route(candidateNodeB1, instance);
-                                if (candidateRouteB1.isFeasible)
-                                    candidateRoutesB.add(candidateRouteB1);
-
-                                Route candidateRouteB2 = new Route(candidateNodeB2, instance);
-                                if (candidateRouteB2.isFeasible)
-                                    candidateRoutesB.add(candidateRouteB2);
-
-                                for (Route candidateRouteA : candidateRoutesA) {
-                                    for (Route candidateRouteB : candidateRoutesB) {
-                                        double newCost = candidateRouteA.totalCost + candidateRouteB.totalCost;
-                                        double delta = newCost - originalCost;
-
-                                        if (delta < bestDelta - COST_TOLERANCE) {
-                                            bestDelta = delta;
-                                            bestRouteA = candidateRouteA;
-                                            bestRouteB = candidateRouteB;
-                                        }
-
-                                    }
-                                }
-
-                            }
-                        }
-                    }
-                }
-
-                if (bestRouteA != null && bestRouteB != null) {
-                    routes.set(route_IndexA, bestRouteA);
-                    routes.set(route_IndexB, bestRouteB);
-                    improved = true;
                 }
             }
         }
