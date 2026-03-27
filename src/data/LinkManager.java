@@ -6,26 +6,29 @@ import java.util.Set;
 
 public class LinkManager {
 
+    private final int numberOfNodes;
     private final Link[][] linkMatrix;
 
-    public LinkManager() {
-        this.linkMatrix = new Link[Data.numberOfNodes][Data.numberOfNodes];
+    public LinkManager(int numberOfNodes) {
+        this.numberOfNodes = numberOfNodes;
+        this.linkMatrix = new Link[numberOfNodes][numberOfNodes];
     }
 
-    public LinkManager(Set<Link> links) {
-        this.linkMatrix = new Link[Data.numberOfNodes][Data.numberOfNodes];
+    public LinkManager(int numberOfNodes, Set<Link> links) {
+        this.numberOfNodes = numberOfNodes;
+        this.linkMatrix = new Link[numberOfNodes][numberOfNodes];
         for (Link link : links) {
-            linkMatrix[link.origin.id()][link.destiny.id()] = link;
+            linkMatrix[link.origin().id()][link.destiny().id()] = link;
         }
     }
 
     public void set(Link link) {
-        linkMatrix[link.origin.id()][link.destiny.id()] = link;
+        linkMatrix[link.origin().id()][link.destiny().id()] = link;
     }
 
     public void setAll(Set<Link> links) {
         for (Link link : links)
-            linkMatrix[link.origin.id()][link.destiny.id()] = link;
+            linkMatrix[link.origin().id()][link.destiny().id()] = link;
     }
 
     public Link get(int originId, int destinyId) {
@@ -43,9 +46,9 @@ public class LinkManager {
         return allLinks;
     }
 
-    public List<Link> getAllIncomingLinks(int nodeIndex) {
+    public List<Link> getAllInbound(int nodeIndex) {
         List<Link> incomingLinks = new ArrayList<>();
-        for (int i = 0; i < Data.allNodes.size(); i++) {
+        for (int i = 0; i < numberOfNodes; i++) {
             Link link = get(i, nodeIndex);
             if (link != null)
                 incomingLinks.add(link);
@@ -53,9 +56,9 @@ public class LinkManager {
         return incomingLinks;
     }
 
-    public List<Link> getAllOutgoingLinks(int nodeIndex) {
+    public List<Link> getAllOutbound(int nodeIndex) {
         List<Link> outgoingLinks = new ArrayList<>();
-        for (int j = 0; j < Data.allNodes.size(); j++) {
+        for (int j = 0; j < numberOfNodes; j++) {
             Link link = get(nodeIndex, j);
             if (link != null)
                 outgoingLinks.add(link);

@@ -1,34 +1,37 @@
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Random;
 
-import data.Data;
+import data.Instance;
 import data.Node;
 import data.Route;
 import data.Solution;
 
 public class Greedy {
-    private static final double NEAREST_NEIGHBOR_PROBABILITY = 0.99;
-    private static final Random random = new Random();
+    private final double NEAREST_NEIGHBOR_PROBABILITY = 0.99;
+    private final Instance instance;
+    private final LocalSearch localSearch;
+    private final Random random = new Random();
+
+    public Greedy(Instance instance, LocalSearch localSearch) {
+        this.instance = instance;
+        this.localSearch = localSearch;
+    }
 
     public Solution run() {
         double startTime = System.currentTimeMillis();
 
         List<Route> routes = new ArrayList<>();
-        List<Node> freeNodes = new ArrayList<>(Data.clientNodes);
-
-        Collections.shuffle(freeNodes);
+        List<Node> freeNodes = new ArrayList<>(instance.clientNodes());
 
         while (!freeNodes.isEmpty()) {
-            Route route = createRoute(freeNodes, NEAREST_NEIGHBOR_PROBABILITY);
+            Route route = createRoute(freeNodes);
             routes.add(route);
         }
 
         double creationTime = (System.currentTimeMillis() - startTime) / 1000.0;
 
-        Solution solution = new LocalSearch().run(new Solution(routes, "Greedy", creationTime, 0.0));
+        Solution solution = localSearch.run(new Solution(routes, "Greedy", creationTime, 0.0));
 
         solution.status = "Greedy";
         solution.creationTime = creationTime;
@@ -36,50 +39,59 @@ public class Greedy {
         return solution;
     }
 
-    private Route createRoute(List<Node> freeNodes, double nearestNeighborProbability) {
+    private Route createRoute(List<Node> freeNodes) {
         List<Node> feasibleNodes = new ArrayList<>(freeNodes);
-        double totalDelivery = 0;
 
-        List<Node> nodes = new ArrayList<>();
-        Node end = Data.depot;
+        double totalRouteDelivery = 0.0;
+        double vehicleCapacity = instance.veichles().getLast().capacity();
+
+        List<Node> trialRoute = new ArrayList<>();
+        Node currentEndNode = instance.depotNode();
 
         while (!feasibleNodes.isEmpty()) {
             Node trialNode = null;
 
-            if (end != Data.depot && random.nextDouble() < nearestNeighborProbability) {
-                final Node currentEnd = end;
-                trialNode = feasibleNodes.stream()
-                        .min(Comparator.comparing(n -> Data.linkManager.get(currentEnd.id(), n.id()).distance))
-                        .orElse(null);
+            if (currentEndNode != instance.depotNode() && random.nextDouble() < NEAREST_NEIGHBOR_PROBABILITY) {
+                double minDistance = Double.MAX_VALUE;
+
+                for (Node candidate : feasibleNodes) {
+                    double distance = instance.linkManager()
+                            .get(currentEndNode.id(), candidate.id())
+                            .distance();
+
+                    if (distance < minDistance) {
+                        minDistance = distance;
+                        trialNode = candidate;
+                    }
+                }
             } else {
                 trialNode = feasibleNodes.get(random.nextInt(feasibleNodes.size()));
             }
 
-            if (trialNode != null) {
-                if (isFeasibleRoute(trialNode, nodes, totalDelivery + trialNode.delivery(), Data.capacity)) {
-                    nodes.add(trialNode);
-                    end = trialNode;
-                    totalDelivery += trialNode.delivery();
-                }
-                feasibleNodes.remove(trialNode);
+            if (isFeasibleRoute(trialRoute, trialNode, totalRouteDelivery + trialNode.delivery(),
+                    vehicleCapacity)) {
+                trialRoute.add(trialNode);
+                currentEndNode = trialNode;
+                totalRouteDelivery += trialNode.delivery();
             }
+            feasibleNodes.remove(trialNode);
         }
-        freeNodes.removeAll(nodes);
-        return new Route(nodes);
+
+        freeNodes.removeAll(trialRoute);
+        return new Route(trialRoute, instance);
     }
 
-    private Boolean isFeasibleRoute(Node trialNode, List<Node> nodes, double loadTrial, double capacity) {
+    private Boolean isFeasibleRoute(List<Node> trialRoute, Node trialNode, double loadTrial, double capacity) {
+        if (loadTrial > capacity)
+            return false;
 
-        if (loadTrial <= capacity) {
-            for (Node next : nodes) {
-                loadTrial += next.pickup() - next.delivery();
-                if (loadTrial > capacity) {
-                    return false;
-                }
-            }
-            return loadTrial + trialNode.pickup() - trialNode.delivery() < capacity;
+        for (Node next : trialRoute) {
+            loadTrial += next.pickup() - next.delivery();
+            if (loadTrial > capacity)
+                return false;
         }
-        return false;
+
+        return loadTrial + trialNode.pickup() - trialNode.delivery() <= capacity;
     }
 
 }

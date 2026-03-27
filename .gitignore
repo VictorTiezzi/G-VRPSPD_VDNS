@@ -1,5 +1,5 @@
+.cplex/*.bin
+
 # folders
 solution/
 out/
-.cplex/
-.devcontainer.json
