@@ -3,9 +3,7 @@ package data;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.logging.Level;
@@ -67,12 +65,12 @@ public class Solution {
                 .collect(Collectors.toList());
     }
 
-    public void exportSolution(String fileDirectory, double bestSolutionTotalCost, double processTime, int cliqueSize) {
-        final int divide = Data.instanceName.contains("CON") || Data.instanceName.contains("SCA") ? 10000 : 1;
+    public void exportSolution(String instanceName, String fileDirectory, double bestSolutionTotalCost,
+            double processTime, int cliqueSize) {
         final String FfileDirectory = fileDirectory;
-        final double FbestSolutionTotalCost = bestSolutionTotalCost / divide;
-        final double totalCost = getTotalCost() / divide;
-        final double lowerBound = this.lowerBound / divide;
+        final double FbestSolutionTotalCost = bestSolutionTotalCost;
+        final double totalCost = getTotalCost();
+        final double lowerBound = this.lowerBound;
         final double gap = this.gap;
         final String status = this.status;
         final double creationTime = this.creationTime;
@@ -93,57 +91,27 @@ public class Solution {
                     printer.printf("%-15s%15.2f\n", "Process time:", FprocessTime);
                     printer.printf("%-15s%15d\n", "Clique size:", FcliqueSize);
                     printer.println("------------------------------");
-                    int count = 0;
+                    int routeCount = 1;
                     for (Route route : routes) {
-                        printer.printf("%-15s", "Route " + (++count) + ": ");
+                        printer.printf("%-15s", "Veichle " + route.veichle.id());
+                        printer.printf("%-15s", "Route " + (routeCount++) + ": ");
                         printer.printf("%5d", 0);
-                        for (int n = 0; n < route.nodes.size(); n++) {
-                            Node node = route.nodes.get(n);
+                        for (Node node : route.nodes)
                             printer.printf("%5d", node.id());
-                        }
                         printer.printf("%5d", 0);
                         printer.println();
                         printer.println("------------------------------");
                     }
-                    printer.println();
-                    printer.println("CPLEX LOG:");
-                    printer.println(cplexLog);
+                    if (!cplexLog.isEmpty()) {
+                        printer.println();
+                        printer.println("CPLEX LOG:");
+                        printer.println(cplexLog);
+                    }
                 } catch (IOException e) {
                     Logger.getLogger(Solution.class.getName()).log(Level.SEVERE, "Exception during solution export", e);
                 }
             });
         }
-    }
-
-    @Override
-    public boolean equals(Object obj) {
-        if (this == obj) {
-            return true;
-        }
-        if (!(obj instanceof Solution other)) {
-            return false;
-        }
-
-        if (this.routes.size() != other.routes.size()) {
-            return false;
-        }
-
-        Set<Link> thisRouteLinks = new HashSet<>();
-        Set<Link> otherRouteLinks = new HashSet<>();
-
-        this.routes.forEach(route -> thisRouteLinks.addAll(new HashSet<>(route.links)));
-        other.routes.forEach(route -> otherRouteLinks.addAll(new HashSet<>(route.links)));
-
-        return thisRouteLinks.equals(otherRouteLinks);
-    }
-
-    @Override
-    public int hashCode() {
-        int result = 0;
-        for (Route route : routes) {
-            result += 31 * route.hashCode();
-        }
-        return result;
     }
 
 }

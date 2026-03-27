@@ -6,57 +6,66 @@ import data.*;
 
 public class LocalSearch {
     private final double COST_TOLERANCE = 0.001;
-    private Solution solution;
+    private final Instance instance;
+    // private Solution solution;
+
+    public LocalSearch(Instance instance) {
+        this.instance = instance;
+    }
 
     public Solution run(Solution solutionIn) {
         double startTime = System.currentTimeMillis();
-        solution = solutionIn;
+        Solution solution = solutionIn;
+
+        List<Route> routes = new ArrayList<>();
+        Double bestTotalCost = 0.0;
+        for (Route route : solution.routes) {
+            routes.add(new Route(route));
+            bestTotalCost += route.totalCost;
+        }
 
         boolean improved = true;
         while (improved) {
             improved = false;
 
             // Perform 2-opt optimization
-            improved |= performTwoOpt();
-
-            // Perform insertion and interchange optimization
-            improved |= performInsertionAndInterchange();
+            improved |= performTwoOpt(routes);
 
             // Perform crossover optimization
-            improved |= performCrossover();
+            improved |= performCrossover(routes);
 
+            // Perform insertion optimization
+            improved |= performInsertion(routes);
+
+            // Perform interchange optimization
+            improved |= performInterchange(routes);
+            
         }
 
-        solution.solvingTime = (System.currentTimeMillis() - startTime) / 1000;
-        solution.lowerBound = 0.0;
-        solution.gap = 0.0;
-        solution.status = "LocalSearch";
-        solution.creationTime = 0.0;
-
-        return solution;
+        return new Solution(routes, "LocalSearch", 0.0, (System.currentTimeMillis() - startTime) / 1000);
     }
 
-    private boolean performTwoOpt() {
+    private boolean performTwoOpt(List<Route> routes) {
         boolean improved = false;
-        for (int route_Index = 0; route_Index < solution.routes.size(); route_Index++) {
-            
+        for (int route_Index = 0; route_Index < routes.size(); route_Index++) {
+
             boolean routeImproved = true;
             while (routeImproved) {
                 routeImproved = false;
 
-                Route route = solution.routes.get(route_Index);
-                outer: 
-                for (int firstIndex = 0; firstIndex < route.nodes.size() - 1; firstIndex++) {
+                Route route = routes.get(route_Index);
+                outer: for (int firstIndex = 0; firstIndex < route.nodes.size() - 1; firstIndex++) {
                     for (int lastIndex = firstIndex + 1; lastIndex < route.nodes.size(); lastIndex++) {
 
                         List<Node> candidateNodes = new ArrayList<>(route.nodes);
                         Collections.reverse(candidateNodes.subList(firstIndex, lastIndex + 1));
 
-                        Route candidateRoute = new Route(candidateNodes);
-                        if (!candidateRoute.isFeasible) continue;
+                        Route candidateRoute = new Route(candidateNodes, instance);
+                        if (!candidateRoute.isFeasible)
+                            continue;
 
                         if (candidateRoute.totalCost < route.totalCost - COST_TOLERANCE) {
-                            solution.routes.set(route_Index, candidateRoute);
+                            routes.set(route_Index, candidateRoute);
                             improved = true;
                             routeImproved = true;
                             break outer;
@@ -64,101 +73,225 @@ public class LocalSearch {
                     }
                 }
 
-            } while (routeImproved);
+            }
         }
         return improved;
     }
 
-    private boolean performInsertionAndInterchange() {
+    private boolean performInsertion(List<Route> routes) {
         boolean improved = false;
+        double bestCost = routes.stream().mapToDouble(route -> route.totalCost).sum();
 
-        List<Node> omega = new ArrayList<>(Data.clientNodes);
+        List<Node> omega = new ArrayList<>(instance.clientNodes());
         Collections.shuffle(omega);
 
         while (!omega.isEmpty()) {
             Node nodeR = omega.removeFirst();
 
-            improved |= tryInsertionInSameRoute(nodeR);
-            improved |= tryInsertionInOtherRoutes(nodeR);
-            improved |= tryInterchangeInSameRoute(nodeR);
-            improved |= tryInterchangeInOtherRoutes(nodeR);
+            List<List<Route>> results = new ArrayList<>();
+
+            results.add(tryInsertionInSameRoute(nodeR, routes));
+            results.add(tryInsertionInOtherRoutes(nodeR, routes));
+
+            for (List<Route> resultRoute : results) {
+                double resultTotalCost = resultRoute.stream().mapToDouble(route -> route.totalCost).sum();
+                if (resultTotalCost < bestCost - COST_TOLERANCE) {
+                    routes = resultRoute;
+                    bestCost = resultTotalCost;
+                }
+            }
         }
 
         return improved;
     }
 
-    private boolean performCrossover() {
+    private boolean performInterchange(List<Route> routes) {
         boolean improved = false;
-        List<Integer> omega = new ArrayList<>();
-        for (int i = 0; i < solution.routes.size(); i++) {
-            omega.add(i);
-        }
+        double bestCost = routes.stream().mapToDouble(route -> route.totalCost).sum();
+
+        List<Node> omega = new ArrayList<>(instance.clientNodes());
         Collections.shuffle(omega);
 
-        for (int indiceRouteA = 0; indiceRouteA < omega.size(); indiceRouteA++) {
-            for (int indiceRouteB = indiceRouteA + 1; indiceRouteB < omega.size(); indiceRouteB++) {
-                Route routeA = solution.routes.get(omega.get(indiceRouteA));
-                Route routeB = solution.routes.get(omega.get(indiceRouteB));
+        while (!omega.isEmpty()) {
+            Node nodeR = omega.removeFirst();
+
+            List<List<Route>> results = new ArrayList<>();
+
+            results.add(tryInterchangeInSameRoute(nodeR, routes));
+            results.add(tryInterchangeInOtherRoutes(nodeR, routes));
+
+            for (List<Route> resultRoute : results) {
+                double resultTotalCost = resultRoute.stream().mapToDouble(route -> route.totalCost).sum();
+                if (resultTotalCost < bestCost - COST_TOLERANCE) {
+                    routes = resultRoute;
+                    bestCost = resultTotalCost;
+                }
+            }
+        }
+
+        return improved;
+    }
+
+    private boolean performCrossover(List<Route> routes) {
+        boolean improved = false;
+
+        boolean routeImproved = true;
+        while (routeImproved) {
+            routeImproved = false;
+
+            outer: for (int route_IndexA = 0; route_IndexA < routes.size(); route_IndexA++) {
+                Route routeA = routes.get(route_IndexA);
+
+                for (int route_IndexB = route_IndexA + 1; route_IndexB < routes.size(); route_IndexB++) {
+                    Route routeB = routes.get(route_IndexB);
+
+                    double originalCost = routeA.totalCost + routeB.totalCost;
+                    double bestDelta = 0;
+                    Route bestRouteA = null, bestRouteB = null;
+
+                    for (int cutA = 0; cutA <= routeA.nodes.size(); cutA++) {
+                        List<Node> preCutA = new ArrayList<>(routeA.nodes.subList(0, cutA));
+                        List<Node> posCutA = new ArrayList<>(routeA.nodes.subList(cutA, routeA.nodes.size()));
+
+                        for (int cutB = 0; cutB <= routeB.nodes.size(); cutB++) {
+                            List<Node> preCutB = new ArrayList<>(routeB.nodes.subList(0, cutB));
+                            List<Node> posCutB = new ArrayList<>(routeB.nodes.subList(cutB, routeB.nodes.size()));
+
+                            List<Node> newNodesA = new ArrayList<>();
+                            newNodesA.addAll(preCutA);
+                            newNodesA.addAll(posCutB);
+
+                            Route candidateRouteA = new Route(newNodesA, instance);
+                            if (!candidateRouteA.isFeasible)
+                                continue;
+
+                            List<Node> newNodesB = new ArrayList<>();
+                            newNodesB.addAll(preCutB);
+                            newNodesB.addAll(posCutA);
+
+                            Route candidateRouteB = new Route(newNodesB, instance);
+                            if (!candidateRouteB.isFeasible)
+                                continue;
+
+                            double newCost = candidateRouteA.totalCost + candidateRouteB.totalCost;
+                            double delta = newCost - originalCost;
+
+                            if (delta < bestDelta - COST_TOLERANCE) {
+                                bestDelta = delta;
+                                bestRouteA = candidateRouteA;
+                                bestRouteB = candidateRouteB;
+
+                            }
+                        }
+                    }
+
+                    if (bestRouteA != null && bestRouteB != null) {
+                        boolean routeAEmpty = bestRouteA.nodes.isEmpty();
+                        boolean routeBEmpty = bestRouteB.nodes.isEmpty();
+                        if (routeAEmpty || routeBEmpty) {
+                            int emptyIndex = routeAEmpty ? route_IndexA : route_IndexB;
+                            int nonEmptyIndex = routeAEmpty ? route_IndexB : route_IndexA;
+                            Route nonEmptyRoute = routeAEmpty ? bestRouteB : bestRouteA;
+
+                            routes.set(nonEmptyIndex, nonEmptyRoute);
+                            routes.remove(emptyIndex);
+
+                        } else {
+                            routes.set(route_IndexA, bestRouteA);
+                            routes.set(route_IndexB, bestRouteB);
+                        }
+
+                        improved = true;
+                        routeImproved = true;
+                        break outer;
+                    }
+                }
+            }
+        }
+        return improved;
+    }
+
+    private boolean performCrossover(List<Route> routes, int zxc) {
+        boolean improved = false;
+
+        for (int route_IndexA = 0; route_IndexA < routes.size(); route_IndexA++) {
+            for (int route_IndexB = route_IndexA + 1; route_IndexB < routes.size(); route_IndexB++) {
+                Route routeA = routes.get(route_IndexA);
+                Route routeB = routes.get(route_IndexB);
                 double originalCost = routeA.totalCost + routeB.totalCost;
                 double bestDelta = 0;
                 Route bestRouteA = null, bestRouteB = null;
 
-                for (int cutA = 0; cutA <= routeA.nodes.size(); cutA++) {
-                    for (int cutB = 0; cutB <= routeB.nodes.size(); cutB++) {
-                        List<Node> newNodesA = new ArrayList<>(routeA.nodes.subList(0, cutA));
-                        newNodesA.addAll(routeB.nodes.subList(cutB, routeB.nodes.size()));
-                        Route candidateRouteA = new Route(newNodesA);
-                        if (!candidateRouteA.isFeasible)
-                            continue;
+                for (int i = 0; i < routeA.nodes.size(); i++) {
+                    for (int j = i + 2; j < routeA.nodes.size(); j++) {
 
-                        List<Node> newNodesB = new ArrayList<>(routeB.nodes.subList(0, cutB));
-                        newNodesB.addAll(routeA.nodes.subList(cutA, routeA.nodes.size()));
-                        Route candidateRouteB = new Route(newNodesB);
-                        if (!candidateRouteB.isFeasible)
-                            continue;
+                        for (int k = 0; k < routeB.nodes.size(); k++) {
+                            for (int l = k + 2; l < routeB.nodes.size(); l++) {
 
-                        double newCost = candidateRouteA.totalCost + candidateRouteB.totalCost;
-                        double delta = newCost - originalCost;
-                        if (delta < bestDelta - COST_TOLERANCE) {
-                            bestDelta = delta;
-                            bestRouteA = candidateRouteA;
-                            bestRouteB = candidateRouteB;
+                                List<Node> candidateNodeA1 = new ArrayList<>(routeA.nodes.subList(0, i));
+                                List<Node> candidateNodeA2 = new ArrayList<>(routeA.nodes.subList(0, i));
+
+                                List<Node> subPathB = new ArrayList<>(routeB.nodes.subList(k, l));
+
+                                candidateNodeA1.addAll(subPathB);
+                                candidateNodeA2.addAll(subPathB.reversed());
+
+                                candidateNodeA1.addAll(routeA.nodes.subList(j, routeA.nodes.size()));
+                                candidateNodeA2.addAll(routeA.nodes.subList(j, routeA.nodes.size()));
+
+                                List<Node> candidateNodeB1 = new ArrayList<>(routeB.nodes.subList(0, k));
+                                List<Node> candidateNodeB2 = new ArrayList<>(routeB.nodes.subList(0, k));
+
+                                List<Node> subPathA = new ArrayList<>(routeA.nodes.subList(i, j));
+
+                                candidateNodeB1.addAll(subPathA);
+                                candidateNodeB2.addAll(subPathA.reversed());
+
+                                candidateNodeB1.addAll(routeB.nodes.subList(l, routeB.nodes.size()));
+                                candidateNodeB2.addAll(routeB.nodes.subList(l, routeB.nodes.size()));
+
+                                List<Route> candidateRoutesA = new ArrayList<>();
+
+                                Route candidateRouteA1 = new Route(candidateNodeA1, instance);
+                                if (candidateRouteA1.isFeasible)
+                                    candidateRoutesA.add(candidateRouteA1);
+
+                                Route candidateRouteA2 = new Route(candidateNodeA2, instance);
+                                if (candidateRouteA2.isFeasible)
+                                    candidateRoutesA.add(candidateRouteA2);
+
+                                List<Route> candidateRoutesB = new ArrayList<>();
+
+                                Route candidateRouteB1 = new Route(candidateNodeB1, instance);
+                                if (candidateRouteB1.isFeasible)
+                                    candidateRoutesB.add(candidateRouteB1);
+
+                                Route candidateRouteB2 = new Route(candidateNodeB2, instance);
+                                if (candidateRouteB2.isFeasible)
+                                    candidateRoutesB.add(candidateRouteB2);
+
+                                for (Route candidateRouteA : candidateRoutesA) {
+                                    for (Route candidateRouteB : candidateRoutesB) {
+                                        double newCost = candidateRouteA.totalCost + candidateRouteB.totalCost;
+                                        double delta = newCost - originalCost;
+
+                                        if (delta < bestDelta - COST_TOLERANCE) {
+                                            bestDelta = delta;
+                                            bestRouteA = candidateRouteA;
+                                            bestRouteB = candidateRouteB;
+                                        }
+
+                                    }
+                                }
+
+                            }
                         }
                     }
                 }
 
                 if (bestRouteA != null && bestRouteB != null) {
-                    boolean routeAEmpty = bestRouteA.nodes.isEmpty();
-                    boolean routeBEmpty = bestRouteB.nodes.isEmpty();
-
-                    if (routeAEmpty || routeBEmpty) {
-                        int emptyIndex = routeAEmpty ? indiceRouteA : indiceRouteB;
-                        int nonEmptyIndex = routeAEmpty ? indiceRouteB : indiceRouteA;
-                        Route nonEmptyRoute = routeAEmpty ? bestRouteB : bestRouteA;
-
-                        solution.routes.set(omega.get(nonEmptyIndex), nonEmptyRoute);
-                        solution.routes.remove((int) omega.get(emptyIndex));
-
-                        int removedIndice = omega.remove(emptyIndex);
-                        if (routeAEmpty)
-                            indiceRouteB--;
-                        omega.addFirst(omega.remove(routeAEmpty ? indiceRouteB : indiceRouteA));
-
-                        for (int i = 0; i < omega.size(); i++) {
-                            if (omega.get(i) > removedIndice) {
-                                omega.set(i, omega.get(i) - 1);
-                            }
-                        }
-                        indiceRouteA = 0;
-                        indiceRouteB = 0;
-                    } else {
-                        solution.routes.set(omega.get(indiceRouteA), bestRouteA);
-                        solution.routes.set(omega.get(indiceRouteB), bestRouteB);
-                        omega.addFirst(omega.remove(indiceRouteB));
-                        omega.addFirst(omega.remove(indiceRouteA + 1));
-                        indiceRouteA = 0;
-                        indiceRouteB = 1;
-                    }
+                    routes.set(route_IndexA, bestRouteA);
+                    routes.set(route_IndexB, bestRouteB);
                     improved = true;
                 }
             }
@@ -166,21 +299,29 @@ public class LocalSearch {
         return improved;
     }
 
-    private int findRouteIndexContainingNode(Node nodeR) {
-        return solution.routes.stream()
-                .filter(route -> route.nodes.contains(nodeR))
-                .findFirst()
-                .map(solution.routes::indexOf)
-                .orElse(-1);
+    private int[] findNodeAndRouteIndexContainingNode(Node nodeR, List<Route> routes) {
+        for (int route_Index = 0; route_Index < routes.size(); route_Index++) {
+            for (int node_Index = 0; node_Index < routes.get(route_Index).nodes.size(); node_Index++) {
+                if (routes.get(route_Index).nodes.get(node_Index) == nodeR)
+                    return new int[] { node_Index, route_Index };
+            }
+        }
+        return new int[] { -1, -1 };
     }
 
-    private Boolean tryInsertionInSameRoute(Node nodeR) {
+    private List<Route> tryInsertionInSameRoute(Node nodeR, List<Route> routes) {
         boolean improved = false;
 
-        int routeR_Index = findRouteIndexContainingNode(nodeR);
-        int nodeR_Index = solution.routes.get(routeR_Index).nodes.indexOf(nodeR);
+        List<Route> copyRoutes = new ArrayList<>();
+        for (Route route : routes) {
+            copyRoutes.add(new Route(route));
+        }
 
-        Route routeR = solution.routes.get(routeR_Index);
+        int[] temp = findNodeAndRouteIndexContainingNode(nodeR, copyRoutes);
+        int nodeR_Index = temp[0];
+        int routeR_Index = temp[1];
+
+        Route routeR = copyRoutes.get(routeR_Index);
 
         List<Node> preCandidateNodesR = new ArrayList<>(routeR.nodes);
         preCandidateNodesR.remove(nodeR_Index);
@@ -195,7 +336,7 @@ public class LocalSearch {
             List<Node> candidateNodesR = new ArrayList<>(preCandidateNodesR);
             candidateNodesR.add(positionK, nodeR);
 
-            Route candidateRouteR = new Route(candidateNodesR);
+            Route candidateRouteR = new Route(candidateNodesR, instance);
             if (!candidateRouteR.isFeasible)
                 continue;
 
@@ -207,23 +348,29 @@ public class LocalSearch {
         }
 
         if (improved)
-            solution.routes.set(routeR_Index, bestCandidateRouteR);
+            copyRoutes.set(routeR_Index, bestCandidateRouteR);
 
-        return improved;
+        return copyRoutes;
     }
 
-    private Boolean tryInsertionInOtherRoutes(Node nodeR) {
+    private List<Route> tryInsertionInOtherRoutes(Node nodeR, List<Route> routes) {
         boolean improved = false;
 
-        int routeR_Index = findRouteIndexContainingNode(nodeR);
-        int nodeR_Index = solution.routes.get(routeR_Index).nodes.indexOf(nodeR);
+        List<Route> copyRoutes = new ArrayList<>();
+        for (Route route : routes) {
+            copyRoutes.add(new Route(route));
+        }
 
-        Route routeR = solution.routes.get(routeR_Index);
+        int[] temp = findNodeAndRouteIndexContainingNode(nodeR, copyRoutes);
+        int nodeR_Index = temp[0];
+        int routeR_Index = temp[1];
+
+        Route routeR = copyRoutes.get(routeR_Index);
 
         List<Node> candidateNodesR = new ArrayList<>(routeR.nodes);
         candidateNodesR.remove(nodeR_Index);
 
-        Route candidateRouteR = new Route(candidateNodesR);
+        Route candidateRouteR = new Route(candidateNodesR, instance);
         if (!candidateRouteR.isFeasible)
             return null;
 
@@ -232,15 +379,16 @@ public class LocalSearch {
         double bestImprovement = 0.0;
         int bestRouteS_Index = -1;
 
-        for (int routeS_Index = 0; routeS_Index < solution.routes.size(); routeS_Index++) {
+        for (int routeS_Index = 0; routeS_Index < copyRoutes.size(); routeS_Index++) {
             if (routeS_Index == routeR_Index)
                 continue;
 
-            Route routeS = solution.routes.get(routeS_Index);
+            Route routeS = copyRoutes.get(routeS_Index);
 
-            int deliveryAux = routeS.deliveryCourse.getFirst() + nodeR.delivery();
-            int pickupAux = routeS.pickupCourse.getLast() + nodeR.pickup();
-            if (deliveryAux > Data.capacity || pickupAux > Data.capacity)
+            double deliveryAux = routeS.deliveryCourse.getFirst() + nodeR.delivery();
+            double pickupAux = routeS.pickupCourse.getLast() + nodeR.pickup();
+            if (deliveryAux > instance.veichles().getLast().capacity()
+                    || pickupAux > instance.veichles().getLast().capacity())
                 continue;
 
             for (int k = 0; k <= routeS.nodes.size(); k++) {
@@ -248,7 +396,7 @@ public class LocalSearch {
 
                 candidateNodesS.add(k, nodeR);
 
-                Route candidateRouteS = new Route(candidateNodesS);
+                Route candidateRouteS = new Route(candidateNodesS, instance);
                 if (!candidateRouteS.isFeasible)
                     continue;
 
@@ -265,39 +413,45 @@ public class LocalSearch {
         }
 
         if (candidateRouteR.nodes.size() > 1) {
-            Route candidateRouteS = new Route(List.of(nodeR));
+            Route candidateRouteS = new Route(List.of(nodeR), instance);
 
             double improvement = candidateRouteR.totalCost + candidateRouteS.totalCost - routeR.totalCost;
             if (improvement < bestImprovement - COST_TOLERANCE) {
                 bestCandidateRouteR = candidateRouteR;
                 bestCandidateRouteS = candidateRouteS;
-                bestRouteS_Index = solution.routes.size();
+                bestRouteS_Index = copyRoutes.size();
                 improved = true;
             }
         }
 
         if (improved) {
-            if (bestRouteS_Index == solution.routes.size()) {
-                solution.routes.add(bestCandidateRouteS);
-            } else {
-                solution.routes.set(bestRouteS_Index, bestCandidateRouteS);
-            }
-            if (candidateRouteR.nodes.isEmpty()) {
-                solution.routes.remove(routeR_Index);
-            } else {
-                solution.routes.set(routeR_Index, bestCandidateRouteR);
-            }
+            if (bestRouteS_Index == copyRoutes.size())
+                copyRoutes.add(bestCandidateRouteS);
+            else
+                copyRoutes.set(bestRouteS_Index, bestCandidateRouteS);
+
+            if (candidateRouteR.nodes.isEmpty())
+                copyRoutes.remove(routeR_Index);
+            else
+                copyRoutes.set(routeR_Index, bestCandidateRouteR);
         }
-        return improved;
+
+        return copyRoutes;
     }
 
-    private Boolean tryInterchangeInSameRoute(Node nodeR) {
+    private List<Route> tryInterchangeInSameRoute(Node nodeR, List<Route> routes) {
         Boolean improved = false;
 
-        int routeR_Index = findRouteIndexContainingNode(nodeR);
-        int nodeR_Index = solution.routes.get(routeR_Index).nodes.indexOf(nodeR);
+        List<Route> copyRoutes = new ArrayList<>();
+        for (Route route : routes) {
+            copyRoutes.add(new Route(route));
+        }
 
-        Route routeR = solution.routes.get(routeR_Index);
+        int[] temp = findNodeAndRouteIndexContainingNode(nodeR, copyRoutes);
+        int nodeR_Index = temp[0];
+        int routeR_Index = temp[1];
+
+        Route routeR = copyRoutes.get(routeR_Index);
 
         double bestCost = routeR.totalCost;
         Route bestCandidateRouteR = null;
@@ -309,7 +463,7 @@ public class LocalSearch {
             List<Node> candidateNodesR = new ArrayList<>(routeR.nodes);
             Collections.swap(candidateNodesR, nodeR_Index, nodeK_Index);
 
-            Route candidateRouteR = new Route(candidateNodesR);
+            Route candidateRouteR = new Route(candidateNodesR, instance);
             if (!candidateRouteR.isFeasible)
                 continue;
 
@@ -321,29 +475,35 @@ public class LocalSearch {
         }
 
         if (improved)
-            solution.routes.set(routeR_Index, bestCandidateRouteR);
+            copyRoutes.set(routeR_Index, bestCandidateRouteR);
 
-        return improved;
+        return copyRoutes;
     }
 
-    private Boolean tryInterchangeInOtherRoutes(Node nodeR) {
+    private List<Route> tryInterchangeInOtherRoutes(Node nodeR, List<Route> routes) {
         Boolean improved = false;
 
-        int routeR_Index = findRouteIndexContainingNode(nodeR);
-        int nodeR_Index = solution.routes.get(routeR_Index).nodes.indexOf(nodeR);
+        List<Route> copyRoutes = new ArrayList<>();
+        for (Route route : routes) {
+            copyRoutes.add(new Route(route));
+        }
 
-        Route routeR = solution.routes.get(routeR_Index);
+        int[] temp = findNodeAndRouteIndexContainingNode(nodeR, copyRoutes);
+        int nodeR_Index = temp[0];
+        int routeR_Index = temp[1];
+
+        Route routeR = copyRoutes.get(routeR_Index);
 
         double bestImprovement = 0.0;
         Route bestCandidateRouteR = null;
         Route bestCandidateRouteS = null;
         int bestRouteS_Index = -1;
 
-        for (int routeS_Index = 0; routeS_Index < solution.routes.size(); routeS_Index++) {
+        for (int routeS_Index = 0; routeS_Index < copyRoutes.size(); routeS_Index++) {
             if (routeS_Index == routeR_Index)
                 continue;
 
-            Route routeS = solution.routes.get(routeS_Index);
+            Route routeS = copyRoutes.get(routeS_Index);
 
             for (int nodeS_Index = 0; nodeS_Index < routeS.nodes.size(); nodeS_Index++) {
                 Node nodeS = routeS.nodes.get(nodeS_Index);
@@ -354,10 +514,10 @@ public class LocalSearch {
                 List<Node> candidateNodesS = new ArrayList<>(routeS.nodes);
                 candidateNodesS.set(nodeS_Index, nodeR);
 
-                Route candidateRouteR = new Route(candidateNodesR);
+                Route candidateRouteR = new Route(candidateNodesR, instance);
                 if (!candidateRouteR.isFeasible)
                     continue;
-                Route candidateRouteS = new Route(candidateNodesS);
+                Route candidateRouteS = new Route(candidateNodesS, instance);
                 if (!candidateRouteS.isFeasible)
                     continue;
 
@@ -374,10 +534,10 @@ public class LocalSearch {
         }
 
         if (improved) {
-            solution.routes.set(routeR_Index, bestCandidateRouteR);
-            solution.routes.set(bestRouteS_Index, bestCandidateRouteS);
+            copyRoutes.set(routeR_Index, bestCandidateRouteR);
+            copyRoutes.set(bestRouteS_Index, bestCandidateRouteS);
         }
 
-        return improved;
+        return copyRoutes;
     }
 }

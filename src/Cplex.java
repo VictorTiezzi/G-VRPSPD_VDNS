@@ -1,26 +1,33 @@
-import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.HashSet;
+import java.util.LinkedList;
+import java.util.List;
 import java.util.Set;
 
-import data.Data;
+import data.Instance;
 import data.Link;
 import data.Solution;
+import ilog.concert.IloException;
+import model.ModelFactory;
+import model.cplex.CplexBaseModel;
+import model.cplex.vrpspd.GVRPSPDModel;
 
 public class Cplex {
 
-    public void solveWithCplex() throws IOException {
+    public void solveWithCplex() throws IloException, Exception {
 
         String timeNow = DateTimeFormatter.ofPattern("yyyy-MM-dd-HH-mm-ss").format(LocalDateTime.now());
         String[] filenames = new String[] { "CMT1X" };
+        ModelFactory modelFactory = GVRPSPDModel.factory();
         int timeLimit = 3600;
 
         for (String filename : filenames) {
-            new Data(filename);
+            Instance instance = new Instance(filename, "SALHI");
+            modelFactory.setCostFunction(instance);
 
             String fileDirectory = String.format("./solution/cplex/%s/%s", filename, timeNow);
             Files.createDirectories(Paths.get(fileDirectory));
@@ -33,37 +40,38 @@ public class Cplex {
             int iterCounter = 0;
             int imprCounter = 0;
 
-            Solution bestSolution = new Greedy().run();
+            Solution bestSolution = new Greedy(instance, new LocalSearch(instance)).run();
             double processTime = (System.currentTimeMillis() - startTime) / 1000;
 
-            bestSolution.exportSolution(
-                    String.format("%s/%s-%06d.sol", fileDirectory, filename, ++iterCounter),
+            bestSolution.exportSolution(instance.instanceName(),
+                    String.format("%s/%s-%06d.sol", fileDirectory, filename, iterCounter++),
                     bestSolution.getTotalCost(),
                     processTime, 0);
 
-            Set<Link> links = new HashSet<>(Data.linkManager.getAll());
+            Set<Link> links = new HashSet<>(instance.linkManager().getAll());
 
-            Model nextModel = new Model(timeLimit, links);
-            nextModel.buildCplexModel();
-            nextModel.solveModel();
+            List<Solution> solutionsFromCplex = new LinkedList<>();
 
-            processTime = (System.currentTimeMillis() - startTime) / 1000;
+            try (CplexBaseModel model = modelFactory.create(instance, links, timeLimit)) {
+                solutionsFromCplex.addAll(model.solve());
+                processTime = (System.currentTimeMillis() - startTime) / 1000;
+                if (solutionsFromCplex.isEmpty())
+                    solutionsFromCplex.add(bestSolution);
+            }
 
-            nextModel.solutionsOut.getFirst().exportSolution(
-                    String.format("%s/%s-%06d.sol", fileDirectory, filename, ++iterCounter),
+            Solution firstSolution = solutionsFromCplex.getFirst();
+
+            firstSolution.exportSolution(instance.instanceName(),
+                    String.format("%s/%s-%06d.sol", fileDirectory, filename, iterCounter),
                     bestSolution.getTotalCost(),
                     processTime, 0);
-            Solution firstSolution = nextModel.solutionsOut.getFirst();
-            nextModel.finalizeModel();
 
             if (firstSolution.getTotalCost() < bestSolution.getTotalCost() - 0.0001) {
-                bestSolution = nextModel.solutionsOut.getFirst();
+                bestSolution = firstSolution;
                 imprCounter++;
                 timeToBest = (System.currentTimeMillis() - startTime) / 1000;
                 iterToBest = iterCounter;
             }
-
-            nextModel.finalizeModel();
 
             PrintStream printer = new PrintStream(fileDirectory + "/" + filename + ".cnt");
             printer.printf("%-30s%8.2f%n", "BEST COST", bestSolution.getTotalCost());

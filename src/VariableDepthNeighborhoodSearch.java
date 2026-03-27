@@ -14,26 +14,30 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
 
-import data.Data;
+import data.Instance;
 import data.Link;
 import data.Node;
 import data.Solution;
+import model.ModelFactory;
+import model.cplex.CplexBaseModel;
 
 public class VariableDepthNeighborhoodSearch {
-    private final int MIN_CLIQUE_SIZE = 4;
-    private final int MAX_CLIQUE_SIZE = Data.numberOfNodes;
+    private final int MIN_CLIQUE_SIZE = 10;
+    private final int MAX_CLIQUE_SIZE;
     private final double COST_TOLERANCE = 0.001;
 
     private final int MAX_SOLUTION_TO_BUILD_CLIQUE = 5;
 
-    private final List<Node> nodes = List.copyOf(Data.clientNodes);
-    private final Node depot = Data.depot;
+    private final List<Node> nodes;
+    private final Node depot;
 
     private final double startTime;
     private final String fileDirectory;
     private final String instanceName;
 
+    private final Instance instance;
     private final LocalSearch localSearch;
+    private final ModelFactory modelFactory;
 
     private Solution bestSolution = null;
     private int cliqueSize = MIN_CLIQUE_SIZE;
@@ -43,22 +47,30 @@ public class VariableDepthNeighborhoodSearch {
     private int iterationToBest = 0;
     private int improvementCount = 0;
 
-    public VariableDepthNeighborhoodSearch(String filename, String solverStartTime, int solverTimeLimit,
-            int subproblemTimeLimit, int executionId) {
+    public VariableDepthNeighborhoodSearch(Instance instance, ModelFactory modelFactory, String solverStartTime,
+            int solverTimeLimit, int subproblemTimeLimit, int executionId) {
 
         startTime = System.currentTimeMillis();
-        instanceName = filename;
+        instanceName = instance.instanceName();
         fileDirectory = String.format("./solution/%s/VDNS/%s/exec_%s/",
-                solverStartTime, filename, executionId);
+                solverStartTime, instanceName, executionId);
         createDirectories();
 
-        localSearch = new LocalSearch();
+        this.instance = instance;
+        this.modelFactory = modelFactory;
+        this.localSearch = new LocalSearch(instance);
+
+        modelFactory.setCostFunction(instance);
+
+        this.depot = instance.depotNode();
+        this.nodes = instance.clientNodes();
+        this.MAX_CLIQUE_SIZE = instance.numberOfNodes();
 
         executeLNSAlgoritm(subproblemTimeLimit, solverTimeLimit);
     }
 
     public void executeLNSAlgoritm(int subproblemTimeLimit, int solverTimeLimit) {
-        this.bestSolution = new Greedy().run();
+        this.bestSolution = new Greedy(instance, localSearch).run();
         exportSolution(bestSolution, "", 0);
         iterationCounter++;
 
@@ -77,36 +89,36 @@ public class VariableDepthNeighborhoodSearch {
             Set<Link> subMatrix = buildSubproblemLinks(clique, allCurrentSolutions);
 
             double timeLimit = Math.min(subproblemTimeLimit, solverTimeLimit - getElapsedTime());
-            if (timeLimit <= 0) break;
-            
+            if (timeLimit <= 0)
+                break;
+
             List<Solution> solutionsFromCplex = new LinkedList<>();
-            Model model = new Model(timeLimit, subMatrix);
-            if (model.solveModel())
-                solutionsFromCplex.addAll(model.solutionsOut);
-            if (solutionsFromCplex.isEmpty())
-                solutionsFromCplex.add(bestSolution);
-            model.finalizeModel();
+
+            try (CplexBaseModel model = modelFactory.create(instance, subMatrix, timeLimit)) {
+                solutionsFromCplex.addAll(model.solve());
+                if (solutionsFromCplex.isEmpty())
+                    solutionsFromCplex.add(bestSolution);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
 
             allCurrentSolutions.clear();
             allCurrentSolutions.add(bestSolution);
 
             Solution bestSolutionFromCplex = solutionsFromCplex.removeFirst();
 
-            if (checkNewSolution(bestSolutionFromCplex)) {
-                createAndCheckNewLocalSearchSolution(bestSolution);
-                allCurrentSolutions.add(bestSolution);
-            }
+            if (checkNewSolution(bestSolutionFromCplex))
+                allCurrentSolutions.add(createAndCheckNewLocalSearchSolution(bestSolution));
 
-            cliqueSize = bestSolutionFromCplex.gap <= 0.01
-                    ? Math.min(cliqueSize + 1, MAX_CLIQUE_SIZE)
-                    : Math.max(cliqueSize - 1, MIN_CLIQUE_SIZE);
+            cliqueSize = solutionsFromCplex.isEmpty() || bestSolutionFromCplex.gap > 0.01
+                    ? Math.max(cliqueSize - 1, MIN_CLIQUE_SIZE)
+                    : Math.min(cliqueSize + 1, MAX_CLIQUE_SIZE);
 
             solutionsFromCplex.removeAll(allCurrentSolutions);
 
-            for (Solution solution : solutionsFromCplex) {
-                createAndCheckNewLocalSearchSolution(solution);
-                allCurrentSolutions.add(solution);
-            }
+            // i < Math.min(MAX_SOLUTION_TO_BUILD_CLIQUE, solutionsFromCplex.size());
+            for (int i = 0; i < solutionsFromCplex.size(); i++)
+                allCurrentSolutions.add(createAndCheckNewLocalSearchSolution(solutionsFromCplex.get(i)));
 
             iterationCounter++;
         } while (getElapsedTime() < solverTimeLimit);
@@ -127,17 +139,16 @@ public class VariableDepthNeighborhoodSearch {
         return false;
     }
 
-    private boolean createAndCheckNewLocalSearchSolution(Solution solution) {
-        solution = localSearch.run(solution);
-        if (solution.getTotalCost() < bestSolution.getTotalCost() - COST_TOLERANCE) {
-            bestSolution = solution;
-            exportSolution(solution, "ls", 0);
+    private Solution createAndCheckNewLocalSearchSolution(Solution solution) {
+        Solution solutionLS = localSearch.run(solution);
+        if (solutionLS.getTotalCost() < bestSolution.getTotalCost() - COST_TOLERANCE) {
+            exportSolution(solutionLS, "ls", 0);
+            bestSolution = solutionLS;
             improvementCount++;
             timeToBest = getElapsedTime();
             iterationToBest = iterationCounter;
-            return true;
         }
-        return false;
+        return solutionLS;
     }
 
     private List<Node> buildClique(List<Node> remainingNodes, int cliqueSize) {
@@ -169,14 +180,14 @@ public class VariableDepthNeighborhoodSearch {
 
     private Node selectNodeByDistance(List<Node> candidates, Node baseNode) {
         double totalWeight = candidates.stream()
-                .mapToDouble(node -> 1 / (Data.linkManager.get(baseNode.id(), node.id()).distance + 0.01))
+                .mapToDouble(node -> 1 / (instance.linkManager().get(baseNode.id(), node.id()).distance() + 0.01))
                 .sum();
 
         NavigableMap<Double, Node> probabilityMap = new TreeMap<>();
         double cumulative = 0;
 
         for (Node node : candidates) {
-            double weight = 1 / (Data.linkManager.get(baseNode.id(), node.id()).distance + 0.01);
+            double weight = 1 / (instance.linkManager().get(baseNode.id(), node.id()).distance() + 0.01);
             cumulative += weight / totalWeight;
             probabilityMap.put(cumulative, node);
         }
@@ -210,29 +221,29 @@ public class VariableDepthNeighborhoodSearch {
         // Adiciona arcos de clique para clique
         for (int i = 0; i < clique.size(); i++) {
             for (int j = i + 1; j < clique.size(); j++) {
-                linkSet.add(Data.linkManager.get(clique.get(i).id(), clique.get(j).id()));
-                linkSet.add(Data.linkManager.get(clique.get(j).id(), clique.get(i).id()));
+                linkSet.add(instance.linkManager().get(clique.get(i).id(), clique.get(j).id()));
+                linkSet.add(instance.linkManager().get(clique.get(j).id(), clique.get(i).id()));
             }
         }
 
         // Adiciona arcos de incoming para clique
         incoming.forEach(node1 -> clique.forEach(node2 -> {
             if (node1.id() != node2.id()) {
-                linkSet.add(Data.linkManager.get(node1.id(), node2.id()));
+                linkSet.add(instance.linkManager().get(node1.id(), node2.id()));
             }
         }));
 
         // Adiciona arcos de clique para outgoing
         clique.forEach(node1 -> outgoing.forEach(node2 -> {
             if (node1.id() != node2.id()) {
-                linkSet.add(Data.linkManager.get(node1.id(), node2.id()));
+                linkSet.add(instance.linkManager().get(node1.id(), node2.id()));
             }
         }));
 
         // Adiciona arcos de incoming para outgoing
         incoming.forEach(node1 -> outgoing.forEach(node2 -> {
             if (node1.id() != node2.id()) {
-                linkSet.add(Data.linkManager.get(node1.id(), node2.id()));
+                linkSet.add(instance.linkManager().get(node1.id(), node2.id()));
             }
         }));
 
@@ -252,7 +263,7 @@ public class VariableDepthNeighborhoodSearch {
     }
 
     private void exportSolution(Solution solution, String suffix, int cliqueSize) {
-        solution.exportSolution(
+        solution.exportSolution(instanceName,
                 fileDirectory + instanceName + String.format("-%06d", iterationCounter) + suffix + ".sol",
                 bestSolution.getTotalCost(), getElapsedTime(), cliqueSize);
     }
