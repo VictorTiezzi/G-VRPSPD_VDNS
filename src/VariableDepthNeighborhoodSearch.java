@@ -22,11 +22,11 @@ import model.ModelFactory;
 import model.cplex.CplexBaseModel;
 
 public class VariableDepthNeighborhoodSearch {
-    private final int MIN_CLIQUE_SIZE = 10;
+    private final int MIN_CLIQUE_SIZE = 4;
     private final int MAX_CLIQUE_SIZE;
     private final double COST_TOLERANCE = 0.001;
 
-    private final int MAX_SOLUTION_TO_BUILD_CLIQUE = 5;
+    private final int MAX_SOLUTION_TO_BUILD_CLIQUE;
 
     private final List<Node> nodes;
     private final Node depot;
@@ -47,13 +47,14 @@ public class VariableDepthNeighborhoodSearch {
     private int iterationToBest = 0;
     private int improvementCount = 0;
 
-    public VariableDepthNeighborhoodSearch(Instance instance, ModelFactory modelFactory, String solverStartTime,
-            int solverTimeLimit, int subproblemTimeLimit, int executionId) {
+    public VariableDepthNeighborhoodSearch(Instance instance, ModelFactory modelFactory, String instanceSet,
+            String solverStartTime,
+            int solverTimeLimit, int subproblemTimeLimit, int lambda, int executionId) {
 
         startTime = System.currentTimeMillis();
         instanceName = instance.instanceName();
-        fileDirectory = String.format("./solution/%s/VDNS/%s/exec_%s/",
-                solverStartTime, instanceName, executionId);
+        fileDirectory = String.format("./solution/%s/%s/%s/exec_%s/",
+                solverStartTime, instanceSet, instanceName, executionId);
         createDirectories();
 
         this.instance = instance;
@@ -65,6 +66,8 @@ public class VariableDepthNeighborhoodSearch {
         this.depot = instance.depotNode();
         this.nodes = instance.clientNodes();
         this.MAX_CLIQUE_SIZE = instance.numberOfNodes();
+
+        this.MAX_SOLUTION_TO_BUILD_CLIQUE = lambda;
 
         executeLNSAlgoritm(subproblemTimeLimit, solverTimeLimit);
     }
@@ -116,8 +119,8 @@ public class VariableDepthNeighborhoodSearch {
 
             solutionsFromCplex.removeAll(allCurrentSolutions);
 
-            // i < Math.min(MAX_SOLUTION_TO_BUILD_CLIQUE, solutionsFromCplex.size());
-            for (int i = 0; i < solutionsFromCplex.size(); i++)
+            // for (int i = 0; i < solutionsFromCplex.size(); i++)
+            for (int i = 0; i < Math.min(MAX_SOLUTION_TO_BUILD_CLIQUE, solutionsFromCplex.size()); i++)
                 allCurrentSolutions.add(createAndCheckNewLocalSearchSolution(solutionsFromCplex.get(i)));
 
             iterationCounter++;

@@ -43,7 +43,7 @@ public class Greedy {
         List<Node> feasibleNodes = new ArrayList<>(freeNodes);
 
         double totalRouteDelivery = 0.0;
-        double vehicleCapacity = instance.veichles().getLast().capacity();
+        double vehicleCapacity = instance.vehicles().getLast().capacity();
 
         List<Node> trialRoute = new ArrayList<>();
         Node currentEndNode = instance.depotNode();

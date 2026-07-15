@@ -21,8 +21,12 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         return new ModelFactory() {
             @Override
             public void setCostFunction(Instance instance) {
-                instance.setCostFunction(route -> route.veichle.fixedCost()
-                        + route.links.stream().mapToDouble(l -> route.veichle.variableCost() * l.distance()).sum());
+                instance.setCostFunction(route -> 
+                        route.vehicle.fixedCost() + 
+                        route.links.stream().mapToDouble(link -> 
+                            route.vehicle.variableCost() * link.distance()
+                        ).sum()
+                );
             }
 
             @Override
@@ -33,28 +37,28 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         };
     }
 
-    private int numberOfVeichles;
-    private List<Veichle> veichles;
+    private int numberOfVehicles;
+    private List<Vehicle> vehicles;
 
     private Map<Link, IloIntVar[]> pathVars = new HashMap<>();
 
     public HVRPSPDModel(Instance instance, Set<Link> links, double timeLimit) throws IloException {
         super(instance, links, timeLimit);
 
-        this.numberOfVeichles = instance.numberOfVeichles();
-        this.veichles = instance.veichles();
+        this.numberOfVehicles = instance.numberOfVehicles();
+        this.vehicles = instance.vehicles();
     }
 
     @Override
     protected void createVariables() throws IloException {
         for (Link link : linkManager.getAll()) {
-            IloIntVar[] vars = new IloIntVar[numberOfVeichles];
-            for (int t = 0; t < numberOfVeichles; t++)
+            IloIntVar[] vars = new IloIntVar[numberOfVehicles];
+            for (int t = 0; t < numberOfVehicles; t++)
                 vars[t] = cplex.boolVar("path" + "(" + link.origin().id() + "," + link.destiny().id() + "," + t + ")");
             pathVars.put(link, vars);
-            deliveryVars.put(link, cplex.numVar(0.0, veichles.getLast().capacity(),
+            deliveryVars.put(link, cplex.numVar(0.0, vehicles.getLast().capacity(),
                     "delivery" + "(" + link.origin().id() + "," + link.destiny().id() + ")"));
-            pickupVars.put(link, cplex.numVar(0.0, veichles.getLast().capacity(),
+            pickupVars.put(link, cplex.numVar(0.0, vehicles.getLast().capacity(),
                     "pickup" + "(" + link.origin().id() + "," + link.destiny().id() + ")"));
         }
     }
@@ -63,11 +67,11 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
     protected void buildObjective() throws IloException {
         IloLinearNumExpr minExp = cplex.linearNumExpr();
         for (Link link : linkManager.getAll()) {
-            for (int t = 0; t < numberOfVeichles; t++) {
+            for (int t = 0; t < numberOfVehicles; t++) {
                 if (link.origin() == depotNode) {
-                    minExp.addTerm(veichles.get(t).fixedCost(), pathVars.get(link)[t]);
+                    minExp.addTerm(vehicles.get(t).fixedCost(), pathVars.get(link)[t]);
                 }
-                minExp.addTerm(veichles.get(t).variableCost() * link.distance(), pathVars.get(link)[t]);
+                minExp.addTerm(vehicles.get(t).variableCost() * link.distance(), pathVars.get(link)[t]);
             }
         }
         cplex.addMinimize(minExp, "expression01");
@@ -95,7 +99,7 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
             List<Route> routes = new ArrayList<>();
 
             for (Link link0 : linkManager.getAllOutbound(depotNode.id())) {
-                for (int i = 0; i < numberOfVeichles; i++) {
+                for (int i = 0; i < numberOfVehicles; i++) {
                     if (cplex.getValue(pathVars.get(link0)[i], sol) > 0.9999) {
                         List<Node> nodes = new ArrayList<>();
                         int destination = link0.destiny().id();
@@ -147,7 +151,7 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         for (Node node : clientNodes) {
             IloLinearNumExpr exp = cplex.linearNumExpr();
             for (Link link : linkManager.getAllInbound(node.id())) {
-                for (int t = 0; t < numberOfVeichles; t++) {
+                for (int t = 0; t < numberOfVehicles; t++) {
                     exp.addTerm(1, pathVars.get(link)[t]);
                 }
             }
@@ -156,21 +160,8 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
     }
 
     private void expression03() throws IloException {
-        for (int i = 1; i < numberOfNodes; i++) {
-            for (int t = 0; t < numberOfVeichles; t++) {
-                IloLinearNumExpr exp = cplex.linearNumExpr();
-                for (Link link : linkManager.getAllInbound(i))
-                    exp.addTerm(1, pathVars.get(link)[t]);
-
-                for (Link link : linkManager.getAllOutbound(i))
-                    exp.addTerm(-1, pathVars.get(link)[t]);
-
-                cplex.addEq(exp, 0, "expression03(" + i + "," + t + ")");
-            }
-        }
-
         for (Node node : clientNodes) {
-            for (int t = 0; t < numberOfVeichles; t++) {
+            for (int t = 0; t < numberOfVehicles; t++) {
                 IloLinearNumExpr exp = cplex.linearNumExpr();
                 for (Link link : linkManager.getAllInbound(node.id())) {
                     exp.addTerm(1, pathVars.get(link)[t]);
@@ -216,9 +207,9 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
 
             exp.addTerm(1, deliveryVars.get(link));
             exp.addTerm(1, pickupVars.get(link));
-            for (int t = 0; t < numberOfVeichles; t++) {
+            for (int t = 0; t < numberOfVehicles; t++) {
                 exp.addTerm(
-                        -(veichles.get(t).capacity()
+                        -(vehicles.get(t).capacity()
                                 - Math.max(0,
                                         Math.max(link.origin().delivery() - link.origin().pickup(),
                                                 link.destiny().pickup() - link.destiny().delivery()))),
@@ -232,7 +223,7 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         for (Link link : linkManager.getAll()) {
             IloLinearNumExpr exp = cplex.linearNumExpr();
             exp.addTerm(1, deliveryVars.get(link));
-            for (int t = 0; t < numberOfVeichles; t++) {
+            for (int t = 0; t < numberOfVehicles; t++) {
                 exp.addTerm(-link.destiny().delivery(), pathVars.get(link)[t]);
             }
             cplex.addGe(exp, 0, "expression07(" + link.origin().id() + "," + link.destiny().id() + ")");
@@ -243,7 +234,7 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         for (Link link : linkManager.getAll()) {
             IloLinearNumExpr exp = cplex.linearNumExpr();
             exp.addTerm(1, pickupVars.get(link));
-            for (int t = 0; t < numberOfVeichles; t++) {
+            for (int t = 0; t < numberOfVehicles; t++) {
                 exp.addTerm(-link.origin().pickup(), pathVars.get(link)[t]);
             }
             cplex.addGe(exp, 0, "expression08(" + link.origin().id() + "," + link.destiny().id() + ")");
@@ -254,8 +245,8 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         for (Link link : linkManager.getAll()) {
             IloLinearNumExpr exp = cplex.linearNumExpr();
             exp.addTerm(1, deliveryVars.get(link));
-            for (int t = 0; t < numberOfVeichles; t++) {
-                exp.addTerm(-(veichles.get(t).capacity() - link.origin().delivery()), pathVars.get(link)[t]);
+            for (int t = 0; t < numberOfVehicles; t++) {
+                exp.addTerm(-(vehicles.get(t).capacity() - link.origin().delivery()), pathVars.get(link)[t]);
             }
             cplex.addLe(exp, 0, "expression09(" + link.origin().id() + "," + link.destiny().id() + ")");
         }
@@ -265,8 +256,8 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         for (Link link : linkManager.getAll()) {
             IloLinearNumExpr exp = cplex.linearNumExpr();
             exp.addTerm(1, pickupVars.get(link));
-            for (int t = 0; t < numberOfVeichles; t++) {
-                exp.addTerm(-(veichles.get(t).capacity() - link.destiny().pickup()), pathVars.get(link)[t]);
+            for (int t = 0; t < numberOfVehicles; t++) {
+                exp.addTerm(-(vehicles.get(t).capacity() - link.destiny().pickup()), pathVars.get(link)[t]);
             }
             cplex.addLe(exp, 0, "expression10(" + link.origin().id() + "," + link.destiny().id() + ")");
         }
@@ -296,7 +287,7 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
         List<Link> links = linkManager.getAll();
         int numLinks = links.size();
 
-        IloNumVar[] allPathCplexVars = new IloNumVar[numLinks * numberOfVeichles];
+        IloNumVar[] allPathCplexVars = new IloNumVar[numLinks * numberOfVehicles];
         IloNumVar[] allDeliveryCplexVars = new IloNumVar[numLinks];
         IloNumVar[] allPickupCplexVars = new IloNumVar[numLinks];
 
@@ -304,7 +295,7 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
 
         for (int index = 0; index < numLinks; index++) {
             Link link = links.get(index);
-            for (int t = 0; t < numberOfVeichles; t++) {
+            for (int t = 0; t < numberOfVehicles; t++) {
                 allPathCplexVars[numLinks * t + index] = pathVars.get(link)[t];
             }
             allDeliveryCplexVars[index] = deliveryVars.get(link);
@@ -314,26 +305,26 @@ public class HVRPSPDModel extends VRPSPDBaseModel {
 
         int solNumber = 1;
         for (Solution solution : solutionsIn) {
-            double[] allPathCplexValues = new double[numLinks * numberOfVeichles];
+            double[] allPathCplexValues = new double[numLinks * numberOfVehicles];
             double[] allDeliveryCplexValues = new double[numLinks];
             double[] allPickupCplexValues = new double[numLinks];
 
             for (Route route : solution.routes) {
                 for (int i = 0; i < route.links.size(); i++) {
                     int index = linkIndexMap.get(route.links.get(i));
-                    allPathCplexValues[numLinks * (route.veichle.id() - 1) + index] = 1;
+                    allPathCplexValues[numLinks * (route.vehicle.id() - 1) + index] = 1;
                     allDeliveryCplexValues[index] = route.deliveryCourse.get(i);
                     allPickupCplexValues[index] = route.pickupCourse.get(i);
                 }
             }
 
-            IloNumVar[] allVars = new IloNumVar[(numLinks * numberOfVeichles) + (numLinks * 2)];
+            IloNumVar[] allVars = new IloNumVar[(numLinks * numberOfVehicles) + (numLinks * 2)];
             System.arraycopy(allPathCplexVars, 0, allVars, 0, allPathCplexVars.length);
             System.arraycopy(allDeliveryCplexVars, 0, allVars, allPathCplexVars.length, allDeliveryCplexVars.length);
             System.arraycopy(allPickupCplexVars, 0, allVars, allPathCplexVars.length + allDeliveryCplexVars.length,
                     allPickupCplexVars.length);
 
-            double[] allValues = new double[(numLinks * numberOfVeichles) + (numLinks * 2)];
+            double[] allValues = new double[(numLinks * numberOfVehicles) + (numLinks * 2)];
             System.arraycopy(allPathCplexValues, 0, allValues, 0, allPathCplexValues.length);
             System.arraycopy(allDeliveryCplexValues, 0, allValues, allPathCplexValues.length,
                     allDeliveryCplexValues.length);

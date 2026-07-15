@@ -5,12 +5,12 @@ import java.util.List;
 
 public class Route {
 
-    public Veichle veichle = null;
+    public Vehicle vehicle = null;
     public List<Node> nodes = new ArrayList<>();
     public List<Link> links = new ArrayList<>();
-    public List<Double> deliveryCourse = new ArrayList<>();
     public List<Double> pickupCourse = new ArrayList<>();
-
+    public List<Double> deliveryCourse = new ArrayList<>();
+    
     public boolean isFeasible = false;
     public double totalCost = Double.MAX_VALUE;
 
@@ -24,35 +24,40 @@ public class Route {
         }
 
         links.add(instance.linkManager().get(instance.depotNode().id(), nodes.getFirst().id()));
-        deliveryCourse.add(nodes.stream().mapToDouble(Node::delivery).sum());
+
         pickupCourse.addFirst(0.0);
 
-        if (deliveryCourse.getLast() > instance.veichles().getLast().capacity())
+        deliveryCourse.add(nodes.stream().mapToDouble(Node::delivery).sum());
+        if (deliveryCourse.getLast() > instance.vehicles().getLast().capacity())
             return;
 
         double biggestLoad = deliveryCourse.getLast();
 
         for (int i = 0; i < nodes.size() - 1; i++) {
             links.add(instance.linkManager().get(nodes.get(i).id(), nodes.get(i + 1).id()));
-            deliveryCourse.add(deliveryCourse.getLast() - links.getLast().origin().delivery());
             pickupCourse.add(pickupCourse.getLast() + links.getLast().origin().pickup());
-            if (deliveryCourse.getLast() + pickupCourse.getLast() > instance.veichles().getLast().capacity())
+            deliveryCourse.add(deliveryCourse.getLast() - links.getLast().origin().delivery());
+            
+            if (pickupCourse.getLast() + deliveryCourse.getLast() > instance.vehicles().getLast().capacity())
                 return;
-            if (deliveryCourse.getLast() + pickupCourse.getLast() > biggestLoad)
-                biggestLoad = deliveryCourse.getLast() + pickupCourse.getLast();
+
+            if (pickupCourse.getLast() + deliveryCourse.getLast() > biggestLoad)
+                biggestLoad = pickupCourse.getLast() + deliveryCourse.getLast();
         }
 
         links.add(instance.linkManager().get(nodes.getLast().id(), instance.depotNode().id()));
-        deliveryCourse.add(deliveryCourse.getLast() - links.getLast().origin().delivery());
         pickupCourse.add(pickupCourse.getLast() + links.getLast().origin().pickup());
-        if (pickupCourse.getLast() > instance.veichles().getLast().capacity())
+        deliveryCourse.add(deliveryCourse.getLast() - links.getLast().origin().delivery());
+    
+        if (pickupCourse.getLast() + deliveryCourse.getLast() > instance.vehicles().getLast().capacity())
             return;
-        if (pickupCourse.getLast() > biggestLoad)
-            biggestLoad = pickupCourse.getLast();
 
-        for (Veichle veichle : instance.veichles()) {
-            if (veichle.capacity() >= biggestLoad) {
-                this.veichle = veichle;
+        if (pickupCourse.getLast() + deliveryCourse.getLast() > biggestLoad)
+            biggestLoad = pickupCourse.getLast() + deliveryCourse.getLast();
+
+        for (Vehicle vehicle : instance.vehicles()) {
+            if (biggestLoad <= vehicle.capacity()) {
+                this.vehicle = vehicle;
                 break;
             }
         }
@@ -62,7 +67,7 @@ public class Route {
     }
 
     public Route(Route route) {
-        this.veichle = route.veichle;
+        this.vehicle = route.vehicle;
         this.nodes = new ArrayList<>(route.nodes);
         this.links.addAll(route.links);
         this.deliveryCourse.addAll(route.deliveryCourse);

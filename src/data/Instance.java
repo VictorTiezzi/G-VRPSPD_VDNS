@@ -17,8 +17,8 @@ public class Instance {
     private final List<Node> clientNodes;
 
     // Vehicle
-    private final int numberOfVeichles;
-    private final List<Veichle> veichles;
+    private final int numberOfVehicles;
+    private final List<Vehicle> vehicles;
 
     private final double totalPickup;
     private final double totalDelivery;
@@ -31,39 +31,44 @@ public class Instance {
     public Instance(String instanceName, String instanceSet) {
 
         String instanceFilePath = "";
+
         switch (instanceSet) {
             case "DETHLOFF" -> instanceFilePath = "./instances/DETHLOFF/" + instanceName + ".vrpspd";
             case "SALHI" -> instanceFilePath = "./instances/SALHI/" + instanceName + ".vrpspd";
-            case "R6", "R7" -> instanceFilePath = "./instances/" + instanceSet + "/" + instanceName + ".vrpspd";
+            case "AVRPSPD" -> instanceFilePath = "./instances/AVRPSPD/" + instanceName + ".vrpspd";
             case "AVCI" -> instanceFilePath = "./instances/AVCI/" + instanceName + ".dat";
+
+            case "TESTAVRPSPD" -> instanceFilePath = "./instances/TEST/avrpspd-training/" + instanceName + ".vrpspd";
+            case "TESTGVRPSPD" -> instanceFilePath = "./instances/TEST/gvrpspd-training/" + instanceName + ".vrpspd";
+            case "TESTHVRPSPD" -> instanceFilePath = "./instances/TEST/hvrpspd-training/" + instanceName + ".dat";
         }
 
         // Initialize final fields
         int numberOfNodes = 0;
         List<Node> allNodes = null;
-        int numberOfVeichles = 0;
-        List<Veichle> veichles = null;
+        int numberOfVehicles = 0;
+        List<Vehicle> vehicles = null;
         double totalPickup = 0;
         double totalDelivery = 0;
         LinkManager linkManager = null;
 
         try (BufferedReader reader = new BufferedReader(new FileReader(instanceFilePath))) {
 
-            if (instanceSet.equals("AVCI")) {
+            if (instanceSet.equals("AVCI") || instanceSet.equals("HVRPSPD")) {
 
                 String line;
                 // Read number of vehicles
                 line = reader.readLine();
-                numberOfVeichles = Integer.parseInt(line.trim());
-                veichles = new ArrayList<>();
-                for (int i = 0; i < numberOfVeichles; i++) {
+                numberOfVehicles = Integer.parseInt(line.trim());
+                vehicles = new ArrayList<>();
+                for (int i = 0; i < numberOfVehicles; i++) {
                     line = reader.readLine();
                     String[] parts = line.trim().split("\\s+");
                     int id = Integer.parseInt(parts[0]);
                     double capacity = Double.parseDouble(parts[1]);
                     double variableCost = Double.parseDouble(parts[2]);
                     double fixedCost = Double.parseDouble(parts[3]);
-                    veichles.add(new Veichle(id, capacity, variableCost, fixedCost));
+                    vehicles.add(new Vehicle(id, capacity, variableCost, fixedCost));
                 }
                 // Read number of nodes
                 line = reader.readLine();
@@ -76,8 +81,8 @@ public class Instance {
                     line = reader.readLine();
                     String[] parts = line.trim().split("\\s+");
                     int id = Integer.parseInt(parts[0]);
-                    int delivery = (int) Math.round(Double.parseDouble(parts[1]));
-                    int pickup = (int) Math.round(Double.parseDouble(parts[2]));
+                    double pickup = Double.parseDouble(parts[2]);
+                    double delivery = Double.parseDouble(parts[1]);
                     double x = Double.parseDouble(parts[3]);
                     double y = Double.parseDouble(parts[4]);
                     Node node = new Node(id, pickup, delivery, x, y);
@@ -100,29 +105,53 @@ public class Instance {
                     }
                 }
 
-            } else if (instanceSet.equals("R6") || instanceSet.equals("R7")) {
+            } else {
 
                 String line;
                 line = reader.readLine();
                 line = reader.readLine();
+                String type = line.trim().split("\\s+")[2];
                 line = reader.readLine();
                 numberOfNodes = Integer.parseInt(line.split(":")[1].trim());
                 line = reader.readLine();
-                numberOfVeichles = Integer.parseInt(line.split(":")[1].trim());
+                numberOfVehicles = Integer.parseInt(line.split(":")[1].trim());
                 line = reader.readLine();
                 double capacity = Double.parseDouble(line.split(":")[1].trim());
-                veichles = new ArrayList<>();
-                veichles.add(new Veichle(1, capacity, 1.0, 1.0));
-                line = reader.readLine();
-                line = reader.readLine();
-                line = reader.readLine();
-
+                vehicles = new ArrayList<>();
+                vehicles.add(new Vehicle(1, capacity, 1.0, 1.0));
                 double[][] distanceMatrix = new double[numberOfNodes][numberOfNodes];
-                for (int i = 0; i < numberOfNodes; i++) {
+
+                if (type.equals("MVRPB")) {
                     line = reader.readLine();
-                    String[] distances = line.trim().split("\\s+");
-                    for (int j = 0; j < numberOfNodes; j++) {
-                        distanceMatrix[i][j] = Double.parseDouble(distances[j]);
+                    line = reader.readLine();
+
+                    int[][] nodeCord = new int[numberOfNodes][2];
+                    for (int i = 0; i < numberOfNodes; i++) {
+                        line = reader.readLine();
+                        String[] cords = line.trim().split("\\s+");
+                        nodeCord[i][0] = Integer.parseInt(cords[1]);
+                        nodeCord[i][1] = Integer.parseInt(cords[2]);
+                    }
+
+                    for (int i = 0; i < numberOfNodes; i++) {
+                        for (int j = i + 1; j < numberOfNodes; j++) {
+                            Double distance = calculateEuclideanDistance(nodeCord[i][0], nodeCord[i][1], nodeCord[j][0], nodeCord[j][1]);
+                            distanceMatrix[i][j] = distance;
+                            distanceMatrix[j][i] = distance;
+                        }
+                    }
+
+                } else {
+                    line = reader.readLine();
+                    line = reader.readLine();
+                    line = reader.readLine();
+
+                    for (int i = 0; i < numberOfNodes; i++) {
+                        line = reader.readLine();
+                        String[] distances = line.trim().split("\\s+");
+                        for (int j = 0; j < numberOfNodes; j++) {
+                            distanceMatrix[i][j] = Double.parseDouble(distances[j]);
+                        }
                     }
                 }
 
@@ -137,8 +166,8 @@ public class Instance {
                     line = line.trim();
                     String[] parts = line.split("\\s+");
 
-                    double pickup = Double.parseDouble(parts[6]);
-                    double delivery = Double.parseDouble(parts[5]);
+                    double pickup = Double.parseDouble(parts[5]);
+                    double delivery = Double.parseDouble(parts[6]);
 
                     Node node = new Node(i, pickup, delivery, 0.0, 0.0);
                     allNodes.add(node);
@@ -169,8 +198,8 @@ public class Instance {
         this.allNodes = allNodes;
         this.depotNode = allNodes.getFirst();
         this.clientNodes = new ArrayList<>(allNodes.subList(1, allNodes.size()));
-        this.numberOfVeichles = numberOfVeichles;
-        this.veichles = veichles;
+        this.numberOfVehicles = numberOfVehicles;
+        this.vehicles = vehicles;
         this.totalPickup = totalPickup;
         this.totalDelivery = totalDelivery;
         this.linkManager = linkManager;
@@ -178,6 +207,10 @@ public class Instance {
 
     private double calculateEuclideanDistance(Node n1, Node n2) {
         return Math.sqrt(Math.pow(n1.x() - n2.x(), 2) + Math.pow(n1.y() - n2.y(), 2));
+    }
+
+    private double calculateEuclideanDistance(int n1x, int n1y, int n2x, int n2y) {
+        return Math.sqrt(Math.pow(n1x - n2x, 2) + Math.pow(n1y - n2y, 2));
     }
 
     public String instanceName() {
@@ -204,12 +237,12 @@ public class Instance {
         return clientNodes;
     }
 
-    public int numberOfVeichles() {
-        return numberOfVeichles;
+    public int numberOfVehicles() {
+        return numberOfVehicles;
     }
 
-    public List<Veichle> veichles() {
-        return veichles;
+    public List<Vehicle> vehicles() {
+        return vehicles;
     }
 
     public double totalPickup() {

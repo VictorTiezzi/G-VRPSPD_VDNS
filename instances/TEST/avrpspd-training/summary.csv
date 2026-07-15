@@ -1,0 +1,5 @@
+instance,scenario,capacity_base,K,Q,total_delivery,total_pickup,asymmetric_arcs
+CAL-SCA3-10,SCA,3,4,782.60,3130.37,2908.18,2550
+CAL-SCA8-10,SCA,8,9,359.35,3234.13,2609.93,2550
+CAL-CON3-10,CON,3,4,912.97,3651.87,2061.72,2550
+CAL-CON8-10,CON,8,9,376.47,3388.18,1636.21,2550

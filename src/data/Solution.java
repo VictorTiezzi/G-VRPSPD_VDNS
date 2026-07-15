@@ -93,7 +93,7 @@ public class Solution {
                     printer.println("------------------------------");
                     int routeCount = 1;
                     for (Route route : routes) {
-                        printer.printf("%-15s", "Veichle " + route.veichle.id());
+                        printer.printf("%-15s", "Vehicle " + route.vehicle.id());
                         printer.printf("%-15s", "Route " + (routeCount++) + ": ");
                         printer.printf("%5d", 0);
                         for (Node node : route.nodes)

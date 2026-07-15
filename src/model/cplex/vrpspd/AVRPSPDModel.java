@@ -14,7 +14,7 @@ import ilog.concert.IloLinearNumExpr;
 import ilog.concert.IloNumVar;
 import model.ModelFactory;
 
-public class VRPSPDModel extends VRPSPDBaseModel {
+public class AVRPSPDModel extends VRPSPDBaseModel {
 
     public static ModelFactory factory() {
         return new ModelFactory() {
@@ -26,7 +26,7 @@ public class VRPSPDModel extends VRPSPDBaseModel {
             @Override
             public model.cplex.CplexBaseModel create(Instance instance, Set<Link> links, double timeLimit)
                     throws IloException {
-                return new VRPSPDModel(instance, links, timeLimit);
+                return new AVRPSPDModel(instance, links, timeLimit);
             }
         };
     }
@@ -37,14 +37,14 @@ public class VRPSPDModel extends VRPSPDBaseModel {
     // for each client i, there is a pickup demand P_i and a delivery demand D_i
     // 1 vehicle type V with capacity Q
 
-    protected Veichle veichle;
+    protected Vehicle vehicle;
 
     protected Map<Link, IloIntVar> pathVars = new HashMap<>();
 
-    public VRPSPDModel(Instance instance, Set<Link> links, double timeLimit) throws IloException {
+    public AVRPSPDModel(Instance instance, Set<Link> links, double timeLimit) throws IloException {
         super(instance, links, timeLimit);
 
-        this.veichle = instance.veichles().getFirst();
+        this.vehicle = instance.vehicles().getFirst();
     }
 
     @Override
@@ -52,9 +52,9 @@ public class VRPSPDModel extends VRPSPDBaseModel {
         for (Link link : linkManager.getAll()) {
             pathVars.put(link, cplex.boolVar(
                     "path" + "(" + link.origin().id() + "," + link.destiny().id() + ")"));
-            deliveryVars.put(link, cplex.numVar(0.0, veichle.capacity(),
+            deliveryVars.put(link, cplex.numVar(0.0, vehicle.capacity(),
                     "delivery" + "(" + link.origin().id() + "," + link.destiny().id() + ")"));
-            pickupVars.put(link, cplex.numVar(0.0, veichle.capacity(),
+            pickupVars.put(link, cplex.numVar(0.0, vehicle.capacity(),
                     "pickup" + "(" + link.origin().id() + "," + link.destiny().id() + ")"));
         }
     }
@@ -187,7 +187,7 @@ public class VRPSPDModel extends VRPSPDBaseModel {
 
             Node nodeI = link.origin();
             Node nodeJ = link.destiny();
-            double M4_ij = veichle.capacity()
+            double M4_ij = vehicle.capacity()
                     - Math.max(0, Math.max(nodeI.delivery() - nodeI.pickup(), nodeJ.pickup() - nodeJ.delivery()));
 
             IloLinearNumExpr expRight = cplex.linearNumExpr();
@@ -233,7 +233,7 @@ public class VRPSPDModel extends VRPSPDBaseModel {
         for (Node nodeI : clientNodes) {
             for (Link link : linkManager.getAllOutbound(nodeI.id())) {
                 IloLinearNumExpr exp = cplex.linearNumExpr();
-                exp.addTerm(veichle.capacity() - link.origin().delivery(), pathVars.get(link));
+                exp.addTerm(vehicle.capacity() - link.origin().delivery(), pathVars.get(link));
                 cplex.addLe(deliveryVars.get(link), exp,
                         "expression09(" + link.origin().id() + "-" + link.destiny().id() + ")");
             }
@@ -246,7 +246,7 @@ public class VRPSPDModel extends VRPSPDBaseModel {
                 if (link.destiny() == depotNode)
                     continue;
                 IloLinearNumExpr exp = cplex.linearNumExpr();
-                exp.addTerm(veichle.capacity() - link.destiny().pickup(), pathVars.get(link));
+                exp.addTerm(vehicle.capacity() - link.destiny().pickup(), pathVars.get(link));
                 cplex.addLe(pickupVars.get(link), exp,
                         "expression10(" + link.origin().id() + "-" + link.destiny().id() + ")");
             }

@@ -8,7 +8,7 @@ import ilog.concert.IloLinearNumExpr;
 import data.*;
 import model.ModelFactory;
 
-public class GVRPSPDModel extends VRPSPDModel {
+public class GVRPSPDModel extends AVRPSPDModel {
     private static final int UNIT_FUEL_COST = 1;
     private static final int FCR_WITHOUT_LOAD = 1;
     private static final int FCR_FULLY_LOADED = 2;
@@ -19,7 +19,7 @@ public class GVRPSPDModel extends VRPSPDModel {
             @Override
             public void setCostFunction(Instance instance) {
                 instance.setCostFunction(route -> {
-                    double alfa = (FCR_FULLY_LOADED - FCR_WITHOUT_LOAD) / route.veichle.capacity();
+                    double alfa = (FCR_FULLY_LOADED - FCR_WITHOUT_LOAD) / route.vehicle.capacity();
                     return route.links.stream().mapToDouble(l -> UNIT_FUEL_COST * l.distance() * (FCR_WITHOUT_LOAD
                             + alfa * (route.deliveryCourse.get(route.links.indexOf(l))
                                     + route.pickupCourse.get(route.links.indexOf(l)))))
@@ -38,7 +38,7 @@ public class GVRPSPDModel extends VRPSPDModel {
     public GVRPSPDModel(Instance instance, Set<Link> links, double timeLimit) throws IloException {
         super(instance, links, timeLimit);
 
-        this.alfa = (FCR_FULLY_LOADED - FCR_WITHOUT_LOAD) / this.veichle.capacity();
+        this.alfa = (FCR_FULLY_LOADED - FCR_WITHOUT_LOAD) / this.vehicle.capacity();
     }
 
     @Override

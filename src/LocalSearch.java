@@ -299,8 +299,8 @@ public class LocalSearch {
 
             double deliveryAux = routeS.deliveryCourse.getFirst() + nodeR.delivery();
             double pickupAux = routeS.pickupCourse.getLast() + nodeR.pickup();
-            if (deliveryAux > instance.veichles().getLast().capacity()
-                    || pickupAux > instance.veichles().getLast().capacity())
+            if (deliveryAux > instance.vehicles().getLast().capacity()
+                    || pickupAux > instance.vehicles().getLast().capacity())
                 continue;
 
             for (int k = 0; k <= routeS.nodes.size(); k++) {

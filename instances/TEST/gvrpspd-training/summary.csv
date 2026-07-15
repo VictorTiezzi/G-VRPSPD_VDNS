@@ -1,0 +1,5 @@
+instance,clients,dimension,capacity,sum_delivery,sum_pickup,min_vehicles_delivery,min_vehicles_pickup,min_vehicles_required
+CMT_CAL120X,120,121,20000,73865,62505,4,4,4
+CMT_CAL120Y,120,121,20000,62505,73865,4,4,4
+CMT_CAL199X,199,200,20000,133476,183993,7,10,10
+CMT_CAL199Y,199,200,20000,183993,133476,10,7,10
