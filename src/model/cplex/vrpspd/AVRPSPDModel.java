@@ -71,7 +71,6 @@ public class AVRPSPDModel extends VRPSPDBaseModel {
 
     @Override
     protected void buildConstraints() throws IloException {
-        expressionVehicleLimit();
         expression02();
         expression03();
         expression04();
@@ -157,20 +156,6 @@ public class AVRPSPDModel extends VRPSPDBaseModel {
             cplex.addMIPStart(allVars, allValues, "MIPStart_" + solNumber);
             solNumber++;
         }
-    }
-
-    private void expressionVehicleLimit() throws IloException {
-        IloLinearIntExpr exp = cplex.linearIntExpr();
-        for (Link link : linkManager.getAllOutbound(depotNode.id())) {
-            exp.addTerm(1, pathVars.get(link));
-        }
-        cplex.addLe(exp, instance.numberOfVehicles(), "expressionVehicleLimit_0j");
-
-        exp = cplex.linearIntExpr();
-        for (Link link : linkManager.getAllInbound(depotNode.id())) {
-            exp.addTerm(1, pathVars.get(link));
-        }
-        cplex.addLe(exp, instance.numberOfVehicles(), "expressionVehicleLimit_i0");
     }
 
     private void expression02() throws IloException {

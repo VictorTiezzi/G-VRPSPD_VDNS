@@ -21,19 +21,13 @@ public class Greedy {
     public Solution run() {
         double startTime = System.currentTimeMillis();
 
-        List<Route> routes;
-        List<Node> freeNodes;
+        List<Route> routes = new ArrayList<>();
+        List<Node> freeNodes = new ArrayList<>(instance.clientNodes());
 
-        do {
-            routes = new ArrayList<>();
-            freeNodes = new ArrayList<>(instance.clientNodes());
-
-            while (!freeNodes.isEmpty()) {
-                Route route = createRoute(freeNodes);
-                routes.add(route);
-            }
-
-        } while (routes.size() > instance.numberOfVehicles());
+        while (!freeNodes.isEmpty()) {
+            Route route = createRoute(freeNodes);
+            routes.add(route);
+        }
 
         double creationTime = (System.currentTimeMillis() - startTime) / 1000.0;
 
