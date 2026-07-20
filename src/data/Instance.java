@@ -33,14 +33,13 @@ public class Instance {
         String instanceFilePath = "";
 
         switch (instanceSet) {
-            case "DETHLOFF" -> instanceFilePath = "./instances/DETHLOFF/" + instanceName + ".vrpspd";
-            case "SALHI" -> instanceFilePath = "./instances/SALHI/" + instanceName + ".vrpspd";
+            case "GVRPSPD" -> instanceFilePath = "./instances/GVRPSPD/" + instanceName + ".vrpspd";
             case "AVRPSPD" -> instanceFilePath = "./instances/AVRPSPD/" + instanceName + ".vrpspd";
-            case "AVCI" -> instanceFilePath = "./instances/AVCI/" + instanceName + ".dat";
+            case "HVRPSPD" -> instanceFilePath = "./instances/HVRPSPD/" + instanceName + ".dat";
 
-            case "TESTAVRPSPD" -> instanceFilePath = "./instances/TEST/avrpspd-training/" + instanceName + ".vrpspd";
-            case "TESTGVRPSPD" -> instanceFilePath = "./instances/TEST/gvrpspd-training/" + instanceName + ".vrpspd";
-            case "TESTHVRPSPD" -> instanceFilePath = "./instances/TEST/hvrpspd-training/" + instanceName + ".dat";
+            case "TRAINGVRPSPD" -> instanceFilePath = "./instances/TRAIN/GVRPSPD/" + instanceName + ".vrpspd";
+            case "TRAINAVRPSPD" -> instanceFilePath = "./instances/TRAIN/AVRPSPD/" + instanceName + ".vrpspd";
+            case "TRAINHVRPSPD" -> instanceFilePath = "./instances/TRAIN/HVRPSPD/" + instanceName + ".dat";
         }
 
         // Initialize final fields
@@ -54,7 +53,7 @@ public class Instance {
 
         try (BufferedReader reader = new BufferedReader(new FileReader(instanceFilePath))) {
 
-            if (instanceSet.equals("AVCI") || instanceSet.equals("HVRPSPD")) {
+            if (instanceSet.equals("HVRPSPD") || instanceSet.equals("TRAINHVRPSPD")) {
 
                 String line;
                 // Read number of vehicles
