@@ -149,11 +149,11 @@ public class LocalSearch {
                     double bestDelta = 0;
                     Route bestRouteA = null, bestRouteB = null;
 
-                    for (int cutA = 0; cutA <= routeA.nodes.size(); cutA++) {
+                    for (int cutA = 1; cutA < routeA.nodes.size(); cutA++) {
                         List<Node> preCutA = new ArrayList<>(routeA.nodes.subList(0, cutA));
                         List<Node> posCutA = new ArrayList<>(routeA.nodes.subList(cutA, routeA.nodes.size()));
 
-                        for (int cutB = 0; cutB <= routeB.nodes.size(); cutB++) {
+                        for (int cutB = 1; cutB < routeB.nodes.size(); cutB++) {
                             List<Node> preCutB = new ArrayList<>(routeB.nodes.subList(0, cutB));
                             List<Node> posCutB = new ArrayList<>(routeB.nodes.subList(cutB, routeB.nodes.size()));
 
@@ -180,29 +180,17 @@ public class LocalSearch {
                                 bestDelta = delta;
                                 bestRouteA = candidateRouteA;
                                 bestRouteB = candidateRouteB;
-
+                                routeImproved = true;
                             }
                         }
                     }
 
-                    if (bestRouteA != null && bestRouteB != null) {
-                        boolean routeAEmpty = bestRouteA.nodes.isEmpty();
-                        boolean routeBEmpty = bestRouteB.nodes.isEmpty();
-                        if (routeAEmpty || routeBEmpty) {
-                            int emptyIndex = routeAEmpty ? route_IndexA : route_IndexB;
-                            int nonEmptyIndex = routeAEmpty ? route_IndexB : route_IndexA;
-                            Route nonEmptyRoute = routeAEmpty ? bestRouteB : bestRouteA;
+                    if (routeImproved) {
 
-                            routes.set(nonEmptyIndex, nonEmptyRoute);
-                            routes.remove(emptyIndex);
-
-                        } else {
-                            routes.set(route_IndexA, bestRouteA);
-                            routes.set(route_IndexB, bestRouteB);
-                        }
+                        routes.set(route_IndexA, bestRouteA);
+                        routes.set(route_IndexB, bestRouteB);
 
                         improved = true;
-                        routeImproved = true;
                         break outer;
                     }
                 }
@@ -278,6 +266,8 @@ public class LocalSearch {
         int routeR_Index = temp[1];
 
         Route routeR = copyRoutes.get(routeR_Index);
+        if (routeR.nodes.size() == 1)
+            return null;
 
         List<Node> candidateNodesR = new ArrayList<>(routeR.nodes);
         candidateNodesR.remove(nodeR_Index);
@@ -324,28 +314,9 @@ public class LocalSearch {
             }
         }
 
-        if (candidateRouteR.nodes.size() > 1) {
-            Route candidateRouteS = new Route(List.of(nodeR), instance);
-
-            double improvement = candidateRouteR.totalCost + candidateRouteS.totalCost - routeR.totalCost;
-            if (improvement < bestImprovement - COST_TOLERANCE) {
-                bestCandidateRouteR = candidateRouteR;
-                bestCandidateRouteS = candidateRouteS;
-                bestRouteS_Index = copyRoutes.size();
-                improved = true;
-            }
-        }
-
         if (improved) {
-            if (bestRouteS_Index == copyRoutes.size())
-                copyRoutes.add(bestCandidateRouteS);
-            else
-                copyRoutes.set(bestRouteS_Index, bestCandidateRouteS);
-
-            if (candidateRouteR.nodes.isEmpty())
-                copyRoutes.remove(routeR_Index);
-            else
-                copyRoutes.set(routeR_Index, bestCandidateRouteR);
+            copyRoutes.set(routeR_Index, bestCandidateRouteR);
+            copyRoutes.set(bestRouteS_Index, bestCandidateRouteS);
         }
 
         return copyRoutes;

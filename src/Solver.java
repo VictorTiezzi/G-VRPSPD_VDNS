@@ -17,7 +17,7 @@ public class Solver {
         String solverStartTime = DateTimeFormatter.ofPattern("yyyy-MM-dd_HH-mm-ss").format(LocalDateTime.now());
 
         String[] filenames = {
-                "CMT1X", "CMT1Y"
+                "SCA8-2", "SCA8-7"
         };
 
         String[] instanceSets = { "AVRPSPD", "GVRPSPD", "HVRPSPD" };
@@ -30,17 +30,12 @@ public class Solver {
         int solverTimeLimit = 1800;
 
         for (String filename : filenames) {
-            int exec = 2;
-            if (filename.equals("CMT1X"))
-                exec = 10;
-            for (; exec <= numberOfExecutions; exec++) {
+            Instance instance = new Instance(filename, "AVRPSPD");
 
-                Instance instance = new Instance(filename, "AVRPSPD");
-
+            for (int exec = 1; exec <= numberOfExecutions; exec++) {
                 new VariableDepthNeighborhoodSearch(instance, AVRPSPDModel.factory(), "AVRPSPD",
                         solverStartTime,
                         solverTimeLimit, subprobTimeLimit, lambda, exec);
-
             }
 
         }
