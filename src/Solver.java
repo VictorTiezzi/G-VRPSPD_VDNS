@@ -29,21 +29,11 @@ public class Solver {
         int numberOfExecutions = 10;
         int solverTimeLimit = 1800;
 
-        for (String filename : filenames) {
-            int exec = 2;
-            if (filename.equals("CMT1X"))
-                exec = 10;
-            for (; exec <= numberOfExecutions; exec++) {
+        Instance instance = new Instance("instance101", "HVRPSPD");
 
-                Instance instance = new Instance(filename, "AVRPSPD");
-
-                new VariableDepthNeighborhoodSearch(instance, AVRPSPDModel.factory(), "AVRPSPD",
-                        solverStartTime,
-                        solverTimeLimit, subprobTimeLimit, lambda, exec);
-
-            }
-
-        }
+        new VariableDepthNeighborhoodSearch(instance, HVRPSPDModel.factory(), "HVRPSPD",
+            solverStartTime,
+            solverTimeLimit, subprobTimeLimit, lambda, 1);
 
     }
 
